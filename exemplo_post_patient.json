@@ -1,0 +1,30 @@
+{
+    "numero_sns": "123456789",
+    "nome": "Helena Oliveira",
+    "genero": "f",
+    "telecom": [
+        {
+            "tipo": "telemóvel",
+            "valor": "929191721"
+        },
+        {
+            "tipo": "email",
+            "valor": "helena.oliveira@gmail.com"
+        }
+    ],
+    "contacto": [
+        {
+            "nome": "Maria",
+            "telecom": [
+                {
+                    "tipo": "telemóvel",
+                    "valor": "927895461"
+                }
+            ],
+            "endereco": [{
+                "tipo": "casa",
+                "valor": "Rua da Universidade, 25"
+            }]
+        }
+    ]
+}

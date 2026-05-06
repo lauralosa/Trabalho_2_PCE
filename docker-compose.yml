@@ -1,0 +1,48 @@
+version: '3.8'
+services:
+  # Base de Dados Relacional
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: clinica_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # Servidor HAPI FHIR 
+  hapi-fhir:
+    image: hapiproject/hapi:latest
+    ports:
+      - "9090:8080"
+    volumes:
+      - .:/fhir8080"
+
+# ----------------------------------------------------
+  #  EHRBASE
+  # ----------------------------------------------------
+
+  # Base de Dados para o EHRbase
+  ehrbase-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: ehrbase
+      POSTGRES_USER: ehrbase
+      POSTGRES_PASSWORD: ehrbase
+    ports:
+      - "5433:5432" 
+
+  # Servidor EHRbase
+  ehrbase:
+    image: ehrbase/ehrbase:latest
+    ports:
+      - "8082:8080" #  API do EHRbase  disponível no localhost:8080
+    environment:
+      DB_URL: jdbc:postgresql://ehrbase-db:5432/ehrbase
+      DB_USER: ehrbase
+      DB_PASS: ehrbase
+      SYSTEM_NAME: local.ehrbase.org
+    depends_on:
+      - ehrbase-db
