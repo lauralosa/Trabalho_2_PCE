@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.7'
 services:
   # Base de Dados Relacional
   db:
@@ -26,7 +26,7 @@ services:
 
   # Base de Dados para o EHRbase
   ehrbase-db:
-    image: postgres:14
+    image: postgres:16
     environment:
       POSTGRES_DB: ehrbase
       POSTGRES_USER: ehrbase
@@ -36,13 +36,33 @@ services:
 
   # Servidor EHRbase
   ehrbase:
-    image: ehrbase/ehrbase:latest
-    ports:
-      - "8082:8080" #  API do EHRbase  disponível no localhost:8080
-    environment:
-      DB_URL: jdbc:postgresql://ehrbase-db:5432/ehrbase
-      DB_USER: ehrbase
-      DB_PASS: ehrbase
-      SYSTEM_NAME: local.ehrbase.org
+    image: ehrbase/ehrbase:2.31.0
     depends_on:
       - ehrbase-db
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ehrbase-db:5432/ehrbase
+      SPRING_DATASOURCE_USERNAME: ehrbase
+      SPRING_DATASOURCE_PASSWORD: ehrbase
+      SPRING_FLYWAY_USER: ehrbase
+      SPRING_FLYWAY_PASSWORD: ehrbase
+      SECURITY_AUTHTYPE: none
+
+  api:
+    build: .
+    container_name: integration-service
+    ports:
+      - "5000:5000"
+    depends_on:
+      - hapi-fhir
+      - ehrbase
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=clinica_db  
+      - DB_USER=user       
+      - DB_PASS=password    
+      - EHRBASE_URL=http://ehrbase:8081/ehrbase/rest/openehr/v1
+      - FHIR_SERVER_URL=http://hapi-fhir:8080/fhir

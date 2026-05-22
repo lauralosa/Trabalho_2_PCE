@@ -12,7 +12,13 @@ from typing import List, Optional, Literal
 import os
 import requests
 HAPI_URL = "http://localhost:9090/fhir"
-EHRBASE_URL = "http://localhost:8082/ehrbase/rest/openehr/v1"
+
+# Configurações EHRbase
+EHRBASE_URL = os.getenv("EHRBASE_URL", "http://ehrbase:8081/ehrbase/rest/openehr/v1")
+EHRBASE_USER = "admin-user"
+EHRBASE_PASS = "RequirementPassword"
+# Autenticação básica para o EHRbase
+EHR_AUTH = (EHRBASE_USER, EHRBASE_PASS)
 
 
 # ==========================================
@@ -464,6 +470,150 @@ async def get_observation_by_id(id: str, user: str = Depends(get_current_user)):
         raise HTTPException(status_code=502, detail=f"Servidor HAPI FHIR inacessível: {str(e)}")
 
 
+MAPA_SINAIS_VITAIS = {
+    "8480-6": {"nome": "Pressão arterial sistólica", "archetype": "openEHR-EHR-OBSERVATION.blood_pressure.v1", "node": "at0004"},
+    "8462-4": {"nome": "Pressão arterial diastólica", "archetype": "openEHR-EHR-OBSERVATION.blood_pressure.v1", "node": "at0005"},
+    "8867-4": {"nome": "Frequência cardíaca", "archetype": "openEHR-EHR-OBSERVATION.pulse.v1", "node": "at0004"},
+    "8310-5": {"nome": "Temperatura corporal", "archetype": "openEHR-EHR-OBSERVATION.body_temperature.v1", "node": "at0004"},
+    "59408-5": {"nome": "Saturação de oxigénio", "archetype": "openEHR-EHR-OBSERVATION.pulse_oximetry.v1", "node": "at0004"},
+    "29463-7": {"nome": "Peso corporal", "archetype": "openEHR-EHR-OBSERVATION.body_weight.v1", "node": "at0004"},
+    "9279-1": {"nome": "Frequência respiratória", "archetype": "openEHR-EHR-OBSERVATION.respiration.v1", "node": "at0004"}
+}
+
+
+
+
+def garantir_ehr(numero_utente: str, patient_fhir_id: str):
+    """
+    Verifica se existe EHR para o utente. Se não, cria-o com ligação bidirecional[cite: 54, 56].
+    """
+    # Consulta se já existe EHR para este subject_id [cite: 54]
+    search_url = f"{EHRBASE_URL}/ehr?subject_id={numero_utente}&subject_namespace=pt.sns.utente"
+    res = requests.get(search_url, auth=EHR_AUTH)
+   
+    if res.status_code == 200:
+        return res.json()['ehr_id']['value']
+   
+    # Caso não exista, cria o EHR registando o Patient.id como externalId [cite: 55, 56]
+    payload = {
+        "_type": "EHR_STATUS",
+        "subject": {
+            "external_ref": {
+                "id": {"_type": "GENERIC_ID", "value": patient_fhir_id, "scheme": "fhir"},
+                "namespace": "pt.sns.utente",
+                "type": "PERSON"
+            }
+        },
+        "is_queryable": True,
+        "is_modifiable": True
+    }
+    create_res = requests.post(f"{EHRBASE_URL}/ehr", json=payload, auth=EHR_AUTH)
+    create_res.raise_for_status()
+    return create_res.json()['ehr_id']['value']
+
+
+def build_openehr_composition(fhir_obs: dict, practitioner_name: str):
+    """
+    Mapeia Observation FHIR para Composição openEHR[cite: 36, 63].
+    """
+    # Extração do código LOINC [cite: 44]
+    try:
+        loinc = fhir_obs.get('code', {}).get('coding', [{}])[0].get('code')
+    except (IndexError, KeyError):
+        return None
+
+
+    info = MAPA_SINAIS_VITAIS.get(loinc)
+    if not info:
+        return None
+
+
+    # Estrutura Canonical JSON
+    return {
+        "_type": "COMPOSITION",
+        "name": {"_type": "DV_TEXT", "value": "Sinais Vitais"},
+        "archetype_details": {
+            "archetype_id": "openEHR-EHR-COMPOSITION.encounter.v1",
+            "template_id": "Sinais vitais", # Deve coincidir com o teu .opt
+            "rm_version": "1.0.4"
+        },
+        "language": {"code_string": "pt", "terminology_id": {"value": "ISO_639-1"}},
+        "territory": {"code_string": "PT", "terminology_id": {"value": "ISO_3166-1"}},
+        "category": {"value": "event", "defining_code": {"terminology_id": {"value": "openehr"}, "code_string": "433"}},
+        "composer": {"_type": "PARTY_IDENTIFIED", "name": practitioner_name}, # Requisito 4.3 [cite: 61]
+        "content": [{
+            "_type": "OBSERVATION",
+            "name": {"_type": "DV_TEXT", "value": info["nome"]},
+            "archetype_node_id": info["archetype"],
+            "data": {
+                "_type": "HISTORY",
+                "name": {"_type": "DV_TEXT", "value": "history"},
+                "origin": {"_type": "DV_DATE_TIME", "value": fhir_obs.get('effectiveDateTime')},
+                "events": [{
+                    "_type": "POINT_EVENT",
+                    "name": {"_type": "DV_TEXT", "value": "any event"},
+                    "time": {"_type": "DV_DATE_TIME", "value": fhir_obs.get('effectiveDateTime')},
+                    "data": {
+                        "_type": "ITEM_TREE",
+                        "name": {"_type": "DV_TEXT", "value": "tree"},
+                        "items": [{
+                            "_type": "ELEMENT",
+                            "name": {"_type": "DV_TEXT", "value": info["nome"]},
+                            "archetype_node_id": info["node"],
+                            "value": {
+                                "_type": "DV_QUANTITY",
+                                "magnitude": fhir_obs.get('valueQuantity', {}).get('value'),
+                                "units": fhir_obs.get('valueQuantity', {}).get('unit')
+                            }
+                        }]
+                    }
+                }]
+            }
+        }]
+    }
+
+
+def obter_nome_medico_fhir(ref: str):
+    """
+    Obtém o recurso Practitioner do HAPI FHIR
+    para extrair o nome ou identificador real.
+    """
+    if not ref:
+        return "Profissional Desconhecido"
+    try:
+        response = requests.get(f"{HAPI_URL}/{ref}", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            # Tenta obter o nome textual
+            return data.get('name', [{}])[0].get('text', "Médico s/ Nome")
+    except:
+        pass
+    return "Erro ao consultar Practitioner"
+
+
+
+# EXTRA
+def validar_composicao_openehr(ehr_id: str, composition: dict):
+    """
+    Desafio Extra: Valida a Composição contra o Template (.opt) no EHRbase
+    antes de a gravar efetivamente.
+    """
+    # O endpoint de validação segue a mesma estrutura da submissão, mas termina em /validate
+    validate_url = f"{EHRBASE_URL}/ehr/{ehr_id}/composition/validate"
+   
+    try:
+        # Enviamos a composição para teste
+        res = requests.post(validate_url, json=composition, auth=EHR_AUTH)
+       
+        if res.status_code == 200:
+            return True, "Composição válida conforme o Template."
+        else:
+            # O EHRbase devolve os erros específicos (ex: campo obrigatório em falta)
+            return False, res.text
+    except Exception as e:
+        return False, f"Erro na ligação ao validador: {str(e)}"
+
+
 #=========================================================
 #Carrega o template Sinais vitais automaticamente
 #=========================================================
@@ -475,38 +625,41 @@ async def carregar_template_ehrbase():
     Lê o ficheiro .opt e faz o upload para o EHRbase.
     """
     nome_ficheiro = "sinais_vitais_tp2.opt"
+    url = f"{EHRBASE_URL}/definition/template/adl1.4"
     
-    if not os.path.exists(nome_ficheiro):
-        print(f" Ficheiro '{nome_ficheiro}' não encontrado.")
-        return
+    print("--- Inicializando Serviço de Integração ---")
 
+    # 1. TENTATIVA DE UPLOAD COM ESPERA (Resiliência)
+    for i in range(20): # Tenta 20 vezes (aprox. 100 segundos)
+        try:
+            if os.path.exists(nome_ficheiro):
+                with open(nome_ficheiro, "r", encoding="utf-8") as file:
+                    template_xml = file.read()
+
+                headers = {"Accept": "application/xml", "Content-Type": "application/xml"}
+                response = requests.post(url, data=template_xml.encode('utf-8'), headers=headers, auth=EHR_AUTH)
+
+                if response.status_code in [200, 201]:
+                    print(" SUCESSO: Template openEHR carregado!")
+                    break
+                elif response.status_code == 409:
+                    print("ℹ INFO: Template já existe no EHRbase.")
+                    break
+            else:
+                print(f" Erro: Ficheiro '{nome_ficheiro}' não encontrado.")
+                break
+        except requests.exceptions.ConnectionError:
+            print(f" Aguardando EHRbase... (Tentativa {i+1}/20)")
+            import time
+            time.sleep(5) # Espera 5 segundos antes de tentar outra vez
+
+    # 2. VERIFICAÇÃO DO HAPI FHIR (Como a tua colega fez)
+    print("--- Verificando Servidor FHIR ---")
     try:
-        # Ler o conteúdo do ficheiro XML
-        with open(nome_ficheiro, "r", encoding="utf-8") as file:
-            template_xml = file.read()
+        res = requests.get(f"{HAPI_URL}/metadata", timeout=3)
+        if res.status_code == 200:
+            print("HAPI FHIR: Online e pronto.") 
+    except Exception:
+        print("HAPI FHIR: Servidor offline.")
 
-        # Preparar os cabeçalhos (Postman)
-        headers = {
-            "Accept": "application/xml",
-            "Content-Type": "application/xml"
-        }
-        
-        # Fazer o pedido POST ao EHRbase
-        url = f"{EHRBASE_URL}/definition/template/adl1.4"
-        print(f"A comunicar com EHRbase para carregar template...")
-        
-        response = requests.post(url, data=template_xml.encode('utf-8'), headers=headers)
-        
-        # Resposta
-        if response.status_code == 201:
-            print(" SUCESSO: Template openEHR carregado automaticamente no EHRbase!")
-        elif response.status_code == 409:
-            # 409 Conflict significa que o template já lá está 
-            print("INFO: O template já existe no EHRbase. Pronto a usar.")
-        else:
-            print(f"ERRO ao carregar template: {response.status_code} - {response.text}")
 
-    except requests.exceptions.ConnectionError:
-        print(" ERRO: Não foi possível conectar ao EHRbase na porta 8080.")
-    except Exception as e:
-        print(f" ERRO ao processar o template: {str(e)}")
