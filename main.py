@@ -37,8 +37,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI(title="Middleware FHIR R4 - Universidade do Minho") 
 
-HAPI_URL = "http://localhost:9090/fhir"
-
 def get_db_connection():
     return psycopg2.connect(host="localhost", port="5432", database="clinica_db", user="user", password="password")
 
@@ -487,14 +485,14 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str):
     """
     Verifica se existe EHR para o utente. Se não, cria-o com ligação bidirecional[cite: 54, 56].
     """
-    # Consulta se já existe EHR para este subject_id [cite: 54]
+    # Consulta se já existe EHR para este subject_id 
     search_url = f"{EHRBASE_URL}/ehr?subject_id={numero_utente}&subject_namespace=pt.sns.utente"
     res = requests.get(search_url, auth=EHR_AUTH)
    
     if res.status_code == 200:
         return res.json()['ehr_id']['value']
    
-    # Caso não exista, cria o EHR registando o Patient.id como externalId [cite: 55, 56]
+    # Caso não exista, cria o EHR registando o Patient.id como externalId 
     payload = {
         "_type": "EHR_STATUS",
         "subject": {
