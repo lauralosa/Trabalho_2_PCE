@@ -11,10 +11,10 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Literal
 import os
 import requests
-HAPI_URL = "http://localhost:9090/fhir"
+HAPI_URL = os.getenv("FHIR_SERVER_URL", "http://localhost:9090/fhir")
 
 # Configurações EHRbase
-EHRBASE_URL = os.getenv("EHRBASE_URL", "http://ehrbase:8081/ehrbase/rest/openehr/v1")
+EHRBASE_URL = os.getenv("EHRBASE_URL", "http://localhost:8085/ehrbase/rest/openehr/v1")
 EHRBASE_USER = "admin-user"
 EHRBASE_PASS = "RequirementPassword"
 # Autenticação básica para o EHRbase
@@ -35,9 +35,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # --- INICIALIZAÇÃO DA API E CONEXÕES EXTERNAS ---
 # ===============================================
 
-app = FastAPI(title="Middleware FHIR R4 - Universidade do Minho") 
-
-HAPI_URL = "http://localhost:9090/fhir"
+app = FastAPI(title="Middleware FHIR R4 - Universidade do Minho")
 
 def get_db_connection():
     return psycopg2.connect(host="localhost", port="5432", database="clinica_db", user="user", password="password")
@@ -512,7 +510,7 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str):
     return create_res.json()['ehr_id']['value']
 
 
-def build_openehr_composition(fhir_obs: dict, practitioner_name: str):
+def build_openehr_composition(fhir_obs: dict, practitioner_info: dict):
     """
     Mapeia Observation FHIR para Composição openEHR[cite: 36, 63].
     """
@@ -528,6 +526,17 @@ def build_openehr_composition(fhir_obs: dict, practitioner_name: str):
         return None
 
 
+    composer = {
+        "_type": "PARTY_IDENTIFIED", 
+        "name": practitioner_info.get("nome", "Desconhecido")
+    }
+    if practitioner_info.get("cedula"):
+        composer["external_ref"] = {
+            "id": {"_type": "GENERIC_ID", "value": practitioner_info["cedula"], "scheme": practitioner_info.get("sistema", "fhir")},
+            "namespace": "pt.ordem",
+            "type": "PERSON"
+        }
+
     # Estrutura Canonical JSON
     return {
         "_type": "COMPOSITION",
@@ -540,7 +549,7 @@ def build_openehr_composition(fhir_obs: dict, practitioner_name: str):
         "language": {"code_string": "pt", "terminology_id": {"value": "ISO_639-1"}},
         "territory": {"code_string": "PT", "terminology_id": {"value": "ISO_3166-1"}},
         "category": {"value": "event", "defining_code": {"terminology_id": {"value": "openehr"}, "code_string": "433"}},
-        "composer": {"_type": "PARTY_IDENTIFIED", "name": practitioner_name}, # Requisito 4.3 [cite: 61]
+        "composer": composer, # Requisito 4.3 [cite: 61]
         "content": [{
             "_type": "OBSERVATION",
             "name": {"_type": "DV_TEXT", "value": info["nome"]},
@@ -573,22 +582,30 @@ def build_openehr_composition(fhir_obs: dict, practitioner_name: str):
     }
 
 
-def obter_nome_medico_fhir(ref: str):
+def obter_dados_medico_fhir(ref: str):
     """
     Obtém o recurso Practitioner do HAPI FHIR
-    para extrair o nome ou identificador real.
+    para extrair o nome e a cédula (identifier).
     """
     if not ref:
-        return "Profissional Desconhecido"
+        return {"nome": "Profissional Desconhecido", "cedula": None, "sistema": None}
     try:
         response = requests.get(f"{HAPI_URL}/{ref}", timeout=5)
         if response.status_code == 200:
             data = response.json()
-            # Tenta obter o nome textual
-            return data.get('name', [{}])[0].get('text', "Médico s/ Nome")
-    except:
+            nome = data.get('name', [{}])[0].get('text', "Médico s/ Nome")
+            cedula = None
+            sistema = None
+            for ident in data.get("identifier", []):
+                if "ordem" in ident.get("system", ""):
+                    cedula = ident.get("value")
+                    sistema = ident.get("system")
+                    break
+            return {"nome": nome, "cedula": cedula, "sistema": sistema}
+    except Exception as e:
+        print(f"Erro ao consultar Practitioner: {e}")
         pass
-    return "Erro ao consultar Practitioner"
+    return {"nome": "Erro ao consultar Practitioner", "cedula": None, "sistema": None}
 
 
 
@@ -612,6 +629,87 @@ def validar_composicao_openehr(ehr_id: str, composition: dict):
             return False, res.text
     except Exception as e:
         return False, f"Erro na ligação ao validador: {str(e)}"
+
+
+#=========================================================
+# Webhook (Subscription) para Observações
+#=========================================================
+@app.post("/webhook/fhir-observation")
+async def receive_observation_webhook(observation: dict):
+    print("--- [WEBHOOK] Recebida nova Observation ---")
+    # 1. Processar Observation
+    if observation.get("resourceType") != "Observation":
+        print("[WEBHOOK] Ignorado: Não é uma Observation.")
+        return {"status": "ignorado", "motivo": "Não é uma Observation"}
+    
+    # 2. Obter Patient ID do FHIR
+    subject_ref = observation.get("subject", {}).get("reference", "")
+    if not subject_ref.startswith("Patient/"):
+        print("[WEBHOOK] Erro: Referência de Patient inválida.")
+        raise HTTPException(status_code=400, detail="Referência de Patient inválida")
+    
+    patient_id = subject_ref.split("/")[1]
+    
+    # Obter os detalhes do Patient no FHIR para buscar o número SNS
+    try:
+        pat_res = requests.get(f"{HAPI_URL}/Patient/{patient_id}")
+        pat_res.raise_for_status()
+        patient_data = pat_res.json()
+    except Exception as e:
+        print(f"[WEBHOOK] Erro ao obter Patient do FHIR: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Falha ao obter Patient do FHIR: {str(e)}")
+        
+    numero_sns = None
+    for ident in patient_data.get("identifier", []):
+        if ident.get("system") == "https://www.sns.gov.pt/utente":
+            numero_sns = ident.get("value")
+            break
+            
+    if not numero_sns:
+        print("[WEBHOOK] Erro: Paciente sem N.º de Utente (SNS).")
+        raise HTTPException(status_code=400, detail="Paciente sem N.º de Utente (SNS)")
+        
+    # 3. Garantir EHR no EHRbase
+    try:
+        ehr_id = garantir_ehr(numero_sns, patient_id)
+        print(f"[WEBHOOK] EHR ID garantido: {ehr_id}")
+    except Exception as e:
+        print(f"[WEBHOOK] Falha ao gerir EHR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Falha ao gerir EHR no EHRbase: {str(e)}")
+        
+    # 4. Obter Practitioner (Composer)
+    performer_ref = None
+    performers = observation.get("performer", [])
+    if performers:
+        performer_ref = performers[0].get("reference")
+        
+    practitioner_info = {"nome": "Desconhecido", "cedula": None, "sistema": None}
+    if performer_ref:
+        practitioner_info = obter_dados_medico_fhir(performer_ref)
+        print(f"[WEBHOOK] Dados do Médico obtidos: {practitioner_info}")
+        
+    # 5. Mapear para Composição
+    composition = build_openehr_composition(observation, practitioner_info)
+    if not composition:
+        print("[WEBHOOK] Ignorado: Código LOINC não suportado ou erro no mapeamento.")
+        return {"status": "ignorado", "motivo": "Código LOINC não suportado"}
+        
+    # Validar (Opcional - Desafio Extra)
+    is_valid, msg = validar_composicao_openehr(ehr_id, composition)
+    if not is_valid:
+        print(f"[WEBHOOK] Aviso de Validação openEHR: {msg}")
+        
+    # 6. Gravar Composição no EHRbase
+    try:
+        comp_url = f"{EHRBASE_URL}/ehr/{ehr_id}/composition"
+        comp_res = requests.post(comp_url, json=composition, auth=EHR_AUTH)
+        comp_res.raise_for_status()
+        comp_id = comp_res.json().get('uid', {}).get('value')
+        print(f"[WEBHOOK] SUCESSO: Composição gravada no EHRbase com ID: {comp_id}")
+        return {"status": "sucesso", "ehr_id": ehr_id, "composition_id": comp_id}
+    except Exception as e:
+        print(f"[WEBHOOK] Falha ao gravar Composition: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Falha ao gravar Composition: {str(e)}")
 
 
 #=========================================================
@@ -643,7 +741,7 @@ async def carregar_template_ehrbase():
                     print(" SUCESSO: Template openEHR carregado!")
                     break
                 elif response.status_code == 409:
-                    print("ℹ INFO: Template já existe no EHRbase.")
+                    print("INFO: Template já existe no EHRbase.")
                     break
             else:
                 print(f" Erro: Ficheiro '{nome_ficheiro}' não encontrado.")
@@ -659,7 +757,6 @@ async def carregar_template_ehrbase():
         res = requests.get(f"{HAPI_URL}/metadata", timeout=3)
         if res.status_code == 200:
             print("HAPI FHIR: Online e pronto.") 
+            
     except Exception:
         print("HAPI FHIR: Servidor offline.")
-
-

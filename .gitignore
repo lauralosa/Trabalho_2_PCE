@@ -1,0 +1,26 @@
+# Ambientes Virtuais
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Ficheiros de configuração locais
+.env
+.env.local
+
+# Ficheiros do Sistema Operativo
+.DS_Store
+Thumbs.db
+
+# Ficheiros gerados pelo editor (VS Code, PyCharm, etc)
+.vscode/
+.idea/
+
+# Outros
+*.log
