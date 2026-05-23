@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 ehrbase_client.py — Comunicação direta com o EHRbase via AQL e REST.
 Usado principalmente pelo Dashboard para consultar sinais vitais históricos.
@@ -5,7 +6,7 @@ Usado principalmente pelo Dashboard para consultar sinais vitais históricos.
 import requests
 import os
 
-EHRBASE_URL = os.getenv("EHRBASE_URL_LOCAL", "http://localhost:8081/ehrbase/rest/openehr/v1")
+EHRBASE_URL = os.getenv("EHRBASE_URL_LOCAL", "http://localhost:8082/ehrbase/rest/openehr/v1")
 EHRBASE_USER = "admin-user"
 EHRBASE_PASS = "RequirementPassword"
 EHR_AUTH = (EHRBASE_USER, EHRBASE_PASS)

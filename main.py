@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Literal
 import os
 import requests
-HAPI_URL = "http://localhost:9090/fhir"
+HAPI_URL = os.getenv("FHIR_SERVER_URL", "http://localhost:9090/fhir")
 
 # Configurações EHRbase
 EHRBASE_URL = os.getenv("EHRBASE_URL", "http://ehrbase:8081/ehrbase/rest/openehr/v1")
@@ -38,7 +38,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 app = FastAPI(title="Middleware FHIR R4 - Universidade do Minho") 
 
 def get_db_connection():
-    return psycopg2.connect(host="localhost", port="5432", database="clinica_db", user="user", password="password")
+    db_host = os.getenv("DB_HOST", "localhost")
+    db_port = os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("DB_NAME", "clinica_db")
+    db_user = os.getenv("DB_USER", "user")
+    db_pass = os.getenv("DB_PASS", "password")
+    return psycopg2.connect(
+        host=db_host,
+        port=db_port,
+        database=db_name,
+        user=db_user,
+        password=db_pass
+    )
 
 
 # ==========================================

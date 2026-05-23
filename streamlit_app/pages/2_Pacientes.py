@@ -9,46 +9,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.auth import require_auth, get_auth_headers
 from utils.api_client import criar_paciente, pesquisar_pacientes
+from utils.style import apply_custom_style
 
 # ─── Configuração ────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Pacientes — PCE", page_icon="👤", layout="wide")
 
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    .page-header {
-        background: linear-gradient(135deg, rgba(13,115,119,0.15), rgba(56,189,248,0.08));
-        border: 1px solid rgba(13,115,119,0.3);
-        border-radius: 14px; padding: 1.2rem 2rem; margin-bottom: 1.5rem;
-    }
-    .page-header h1 { margin:0; font-size:1.6rem; font-weight:700; }
-    .page-header p  { margin:0.3rem 0 0; color:#64748b; font-size:0.85rem; }
-
-    .form-section {
-        background: rgba(17,24,39,0.8);
-        border: 1px solid #1e293b;
-        border-radius: 12px; padding: 1.5rem 2rem; margin-bottom: 1rem;
-    }
-    .form-section h3 { margin:0 0 1rem; font-size:1rem; color:#94a3b8; }
-
-    .stButton > button {
-        background: linear-gradient(135deg, #0d7377, #14a085);
-        color:white; border:none; border-radius:8px; font-weight:600;
-    }
-    .stButton > button:hover { transform:translateY(-1px); }
-
-    .result-card {
-        background: rgba(13,115,119,0.08);
-        border: 1px solid rgba(13,115,119,0.2);
-        border-radius: 10px; padding: 1rem 1.3rem; margin: 0.5rem 0;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# Aplicar estilo premium global
+apply_custom_style()
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 token = require_auth()
@@ -57,16 +24,16 @@ headers = get_auth_headers()
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown(
     """
-    <div class="page-header">
-        <h1>👤 Gestão de Pacientes</h1>
-        <p>Regista novos utentes ou pesquisa utentes existentes no sistema FHIR R4</p>
+    <div class="premium-card">
+        <h1 style="font-size: 1.8rem; font-weight: 700; color: #1c2b3e; margin:0;">Gestão de Pacientes</h1>
+        <p style="margin: 0.3rem 0 0 0; color: #5c6e84; font-size: 0.9rem;">Registo de novos utentes e consultas de registos no repositório interoperável FHIR R4</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab_criar, tab_pesquisar = st.tabs(["➕ Registar Paciente", "🔍 Pesquisar Pacientes"])
+tab_criar, tab_pesquisar = st.tabs(["Registar Paciente", "Pesquisar Pacientes"])
 
 # ══════════════════════════════════════════════════════════════
 # TAB 1 — CRIAR PACIENTE
@@ -76,7 +43,7 @@ with tab_criar:
 
     with st.form("form_paciente", clear_on_submit=True):
         # ── Identificação ───────────────────────────────────────
-        st.markdown("#### 🪪 Identificação")
+        st.markdown("#### Identificação")
         col1, col2 = st.columns(2)
         with col1:
             numero_sns = st.text_input(
@@ -95,12 +62,12 @@ with tab_criar:
             "Género *",
             options=["feminino", "masculino"],
             horizontal=True,
-            format_func=lambda x: ("♀ Feminino" if x == "feminino" else "♂ Masculino"),
+            format_func=lambda x: ("Feminino" if x == "feminino" else "Masculino"),
         )
 
         st.markdown("---")
         # ── Contactos ──────────────────────────────────────────
-        st.markdown("#### 📞 Contactos do Utente")
+        st.markdown("#### Contactos do Utente")
         col3, col4 = st.columns(2)
         with col3:
             telemovel = st.text_input(
@@ -117,7 +84,7 @@ with tab_criar:
 
         st.markdown("---")
         # ── Contacto de Emergência ─────────────────────────────
-        st.markdown("#### 🆘 Contacto de Emergência")
+        st.markdown("#### Contacto de Emergência")
         col5, col6 = st.columns(2)
         with col5:
             contacto_nome = st.text_input(
@@ -138,7 +105,7 @@ with tab_criar:
 
         st.markdown("<br>", unsafe_allow_html=True)
         submitted = st.form_submit_button(
-            "✅ Registar Paciente",
+            "Registar Paciente",
             use_container_width=True,
             type="primary",
         )
@@ -158,7 +125,7 @@ with tab_criar:
 
         if erros:
             for erro in erros:
-                st.error(f"❌ {erro}")
+                st.error(erro)
         else:
             # Construir o payload para a API
             telecom_list = [{"tipo": "telemóvel", "valor": telemovel.strip()}]
@@ -184,11 +151,11 @@ with tab_criar:
                     resultado = criar_paciente(payload, headers)
 
                 st.success(
-                    f"✅ Paciente **{nome}** registado com sucesso! "
-                    f"FHIR ID: `{resultado.get('id', '—')}`"
+                    f"Paciente {nome} registado com sucesso! "
+                    f"FHIR ID: {resultado.get('id', '—')}"
                 )
-                st.markdown("**Recurso FHIR criado:**")
-                st.json(resultado)
+                with st.expander("Ver recurso FHIR criado"):
+                    st.json(resultado)
 
             except Exception as e:
                 detalhe = str(e)
@@ -197,7 +164,7 @@ with tab_criar:
                         detalhe = e.response.json().get("detail", e.response.text)
                     except Exception:
                         detalhe = e.response.text
-                st.error(f"❌ Erro ao registar paciente: {detalhe}")
+                st.error(f"Erro ao registar paciente: {detalhe}")
 
 # ══════════════════════════════════════════════════════════════
 # TAB 2 — PESQUISAR PACIENTES
@@ -209,7 +176,7 @@ with tab_pesquisar:
     with col_q:
         nome_pesquisa = st.text_input(
             "Pesquisar por nome",
-            placeholder="Ex: Helena (deixa em branco para ver todos)",
+            placeholder="Introduza o nome (deixe em branco para listar todos)",
             label_visibility="collapsed",
             key="pesq_paciente_nome",
         )
@@ -225,9 +192,9 @@ with tab_pesquisar:
                 )
 
             if not entries:
-                st.info("📭 Nenhum paciente encontrado.")
+                st.info("Nenhum paciente encontrado.")
             else:
-                st.success(f"✅ {len(entries)} paciente(s) encontrado(s).")
+                st.success(f"{len(entries)} paciente(s) encontrado(s).")
                 for entry in entries:
                     resource = entry.get("resource", entry)
                     pid = resource.get("id", "—")
@@ -243,17 +210,17 @@ with tab_pesquisar:
 
                     st.markdown(
                         f"""
-                        <div class="result-card">
-                            <strong style="color:#e2e8f0;">{pnome}</strong> &nbsp;
-                            <span style="color:#64748b;">({pid})</span><br>
-                            <span style="font-size:0.85rem; color:#94a3b8;">
-                                SNS: <strong style="color:#0d7377;">{sns}</strong> &nbsp;|&nbsp;
-                                Género: {pgenero} &nbsp;|&nbsp;
-                                ☎ {tel}
+                        <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important; background: rgba(255,255,255,0.75) !important;">
+                            <strong style="color:#1c2b3e; font-size:1.1rem; font-family:'Outfit';">{pnome}</strong> &nbsp;
+                            <span style="color:#5c6e84; font-size:0.85rem;">({pid})</span><br>
+                            <span style="font-size:0.88rem; color:#5c6e84; line-height:1.6;">
+                                SNS: <strong style="color:#1c2b3e;">{sns}</strong> &nbsp;·&nbsp;
+                                Género: {pgenero} &nbsp;·&nbsp;
+                                Telemóvel: {tel}
                             </span>
                         </div>
                         """,
                         unsafe_allow_html=True,
                     )
         except Exception as e:
-            st.error(f"❌ Erro ao pesquisar: {e}")
+            st.error(f"Erro ao pesquisar: {e}")

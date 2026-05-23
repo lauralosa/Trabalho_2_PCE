@@ -13,6 +13,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.auth import require_auth, get_auth_headers
+from utils.style import apply_custom_style
 from utils.ehrbase_client import (
     get_ehr_by_subject,
     query_sinais_vitais_aql,
@@ -29,61 +30,8 @@ st.set_page_config(
 
 HAPI_URL = os.getenv("HAPI_FHIR_URL", "http://localhost:9090/fhir")
 
-# CSS adicional para o dashboard
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    .dashboard-header {
-        background: linear-gradient(135deg, rgba(13,115,119,0.2), rgba(20,160,133,0.1));
-        border: 1px solid rgba(13,115,119,0.3);
-        border-radius: 14px;
-        padding: 1.5rem 2rem;
-        margin-bottom: 1.5rem;
-    }
-    .dashboard-header h1 { margin: 0; font-size: 1.8rem; font-weight: 700; }
-    .dashboard-header p  { margin: 0.3rem 0 0 0; color: #64748b; font-size: 0.9rem; }
-
-    .vital-card {
-        background: rgba(17,24,39,0.9);
-        border: 1px solid #1e293b;
-        border-radius: 12px;
-        padding: 1.2rem;
-        text-align: center;
-        transition: border-color 0.3s;
-    }
-    .vital-card:hover { border-color: #0d7377; }
-    .vital-card .vc-emoji  { font-size: 1.8rem; }
-    .vital-card .vc-label  { font-size: 0.78rem; color: #64748b; margin: 0.3rem 0 0.1rem; }
-    .vital-card .vc-value  { font-size: 1.7rem; font-weight: 700; color: #e2e8f0; }
-    .vital-card .vc-unit   { font-size: 0.8rem; color: #94a3b8; }
-    .vital-card .vc-date   { font-size: 0.7rem; color: #475569; margin-top: 0.4rem; }
-
-    .patient-info-card {
-        background: rgba(13,115,119,0.08);
-        border: 1px solid rgba(13,115,119,0.25);
-        border-radius: 12px;
-        padding: 1.2rem 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .stButton > button {
-        background: linear-gradient(135deg, #0d7377, #14a085);
-        color: white; border: none; border-radius: 8px; font-weight: 600;
-    }
-    .stButton > button:hover { transform: translateY(-1px); }
-
-    [data-testid="metric-container"] {
-        background: rgba(13,115,119,0.1);
-        border: 1px solid rgba(13,115,119,0.3);
-        border-radius: 12px; padding: 1rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# Aplicar estilo premium global
+apply_custom_style()
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 token = require_auth()
@@ -92,9 +40,9 @@ headers = get_auth_headers()
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown(
     """
-    <div class="dashboard-header">
-        <h1>📊 Dashboard de Sinais Vitais</h1>
-        <p>Consulta o histórico clínico de um utente pelo N.º de Utente SNS</p>
+    <div class="premium-card">
+        <h1 style="font-size: 1.8rem; font-weight: 700; color: #1c2b3e; margin:0;">Dashboard de Sinais Vitais</h1>
+        <p style="margin: 0.3rem 0 0 0; color: #5c6e84; font-size: 0.9rem;">Consulta de histórico clínico integrado por número de utente SNS</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -104,15 +52,15 @@ st.markdown(
 col_search, col_btn = st.columns([4, 1])
 with col_search:
     numero_utente = st.text_input(
-        "🔍 N.º de Utente SNS",
-        placeholder="Ex: 123456789",
+        "N.º de Utente SNS",
+        placeholder="Introduza o N.º de Utente SNS (Ex: 123456789)",
         label_visibility="collapsed",
         key="dashboard_sns_input",
     )
 with col_btn:
     pesquisar = st.button("Pesquisar", use_container_width=True, type="primary")
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ─── Resultados ───────────────────────────────────────────────────────────────
 if pesquisar and numero_utente.strip():
@@ -150,28 +98,28 @@ if pesquisar and numero_utente.strip():
 
         st.markdown(
             f"""
-            <div class="patient-info-card">
-                <table style="width:100%; border:none;">
+            <div class="premium-card" style="background: rgba(255, 255, 255, 0.75) !important;">
+                <table style="width:100%; border:none; border-collapse:collapse;">
                     <tr>
-                        <td style="width:60px; vertical-align:middle;">
+                        <td style="width:65px; vertical-align:middle;">
                             <span style="font-size:2.5rem;">{'👩' if genero.lower() in ['female','feminino','f'] else '👨'}</span>
                         </td>
                         <td style="vertical-align:middle;">
-                            <strong style="font-size:1.2rem; color:#e2e8f0;">{nome}</strong><br>
-                            <span style="color:#64748b; font-size:0.85rem;">
-                                SNS: <strong style="color:#0d7377;">{numero_utente}</strong> &nbsp;|&nbsp;
-                                Género: {genero} &nbsp;|&nbsp;
-                                FHIR ID: {fhir_id} &nbsp;|&nbsp;
-                                ☎ {contacto_tel} &nbsp;|&nbsp;
-                                ✉ {contacto_email}
+                            <strong style="font-size:1.3rem; color:#1c2b3e; font-family:'Outfit';">{nome}</strong><br>
+                            <span style="color:#5c6e84; font-size:0.88rem; line-height:1.6;">
+                                SNS: <strong style="color:#1c2b3e;">{numero_utente}</strong> &nbsp;·&nbsp;
+                                Género: {genero} &nbsp;·&nbsp;
+                                FHIR ID: {fhir_id} &nbsp;·&nbsp;
+                                Telemóvel: {contacto_tel} &nbsp;·&nbsp;
+                                Email: {contacto_email}
                             </span>
                         </td>
                         <td style="text-align:right; vertical-align:middle;">
-                            <span style="background:{'rgba(13,115,119,0.2)' if ehr else 'rgba(239,68,68,0.15)'}; 
-                                   border:1px solid {'#0d7377' if ehr else '#ef4444'};
-                                   border-radius:20px; padding:4px 12px; font-size:0.8rem;
-                                   color:{'#0d7377' if ehr else '#ef4444'};">
-                                {'✅ EHR Registado' if ehr else '⚠️ Sem EHR'}
+                            <span style="background:{'rgba(28,43,62,0.06)' if ehr else 'rgba(239,68,68,0.1)'}; 
+                                   border:1px solid {'rgba(28,43,62,0.15)' if ehr else '#ef4444'};
+                                   border-radius:20px; padding:6px 14px; font-size:0.8rem; font-weight:600;
+                                   color:{'#1c2b3e' if ehr else '#ef4444'};">
+                                {'EHR Ativo' if ehr else 'Sem Registo EHR'}
                             </span>
                         </td>
                     </tr>
@@ -181,7 +129,7 @@ if pesquisar and numero_utente.strip():
             unsafe_allow_html=True,
         )
     else:
-        st.warning(f"⚠️ Nenhum paciente encontrado com o N.º de Utente **{numero_utente}**.")
+        st.warning(f"Nenhum paciente encontrado com o N.º de Utente SNS {numero_utente}.")
 
     # ── Sinais Vitais ─────────────────────────────────────────────────────────
     # Estratégia: tenta EHRbase AQL primeiro; se vazio usa FHIR como fallback
@@ -224,7 +172,7 @@ if pesquisar and numero_utente.strip():
         df["data_fmt"] = "—"
 
     # ── Cards com valor mais recente ──────────────────────────────────────────
-    st.markdown("### 📌 Valores Mais Recentes")
+    st.markdown("### Valores Mais Recentes")
 
     tipos_unicos = df["tipo"].dropna().unique().tolist()
     cols_cards = st.columns(min(len(tipos_unicos), 4))
@@ -246,16 +194,19 @@ if pesquisar and numero_utente.strip():
         unidade = ultimo.get("unidade", unidade_default) if ultimo is not None else unidade_default
         data_str = ultimo.get("data_fmt", "—") if ultimo is not None else "—"
 
+        valor_fmt = f"{valor:.1f}" if isinstance(valor, float) else valor
+
         col_idx = i % min(len(tipos_unicos), 4)
         with cols_cards[col_idx]:
             st.markdown(
                 f"""
-                <div class="vital-card">
-                    <div class="vc-emoji">{emoji}</div>
-                    <div class="vc-label">{tipo}</div>
-                    <div class="vc-value">{f"{valor:.1f}" if isinstance(valor, float) else valor}</div>
-                    <div class="vc-unit">{unidade}</div>
-                    <div class="vc-date">📅 {data_str}</div>
+                <div class="premium-card" style="text-align: center; padding: 1.2rem !important; margin-bottom: 1rem !important;">
+                    <div style="font-size: 1.8rem; margin-bottom: 0.3rem;">{emoji}</div>
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #5c6e84; text-transform: uppercase; letter-spacing: 0.5px; height: 35px; overflow: hidden; display: flex; align-items: center; justify-content: center;">{tipo}</div>
+                    <div style="font-size: 2.2rem; font-weight: 700; color: #1c2b3e; line-height: 1.1; margin: 0.2rem 0; font-family:'Outfit';">
+                        {valor_fmt} <span style="font-size: 0.95rem; font-weight: 500; color: #5c6e84;">{unidade}</span>
+                    </div>
+                    <div style="font-size: 0.7rem; color: #8fa0b5; margin-top: 0.5rem;">{data_str}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -264,7 +215,7 @@ if pesquisar and numero_utente.strip():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Abas: Gráficos + Tabela ───────────────────────────────────────────────
-    tab_graficos, tab_tabela = st.tabs(["📈 Gráficos", "📋 Tabela de Registos"])
+    tab_graficos, tab_tabela = st.tabs(["Gráficos", "Tabela de Registos"])
 
     with tab_graficos:
         if "data_dt" in df.columns and df["data_dt"].notna().any():
@@ -292,41 +243,45 @@ if pesquisar and numero_utente.strip():
                         y=df_tipo["valor"],
                         mode="lines+markers",
                         name=tipo,
-                        line=dict(color="#0d7377", width=2.5),
-                        marker=dict(size=8, color="#14a085", symbol="circle"),
+                        line=dict(color="#1c2b3e", width=2.5),
+                        marker=dict(size=8, color="#f2afc6", line=dict(color="#1c2b3e", width=1.5), symbol="circle"),
                         hovertemplate=f"<b>{tipo}</b><br>Valor: %{{y:.1f}} {unidade}<br>Data: %{{x|%d/%m/%Y %H:%M}}<extra></extra>",
                     )
                 )
 
                 fig.update_layout(
                     title=dict(
-                        text=f"{emoji} {tipo}",
-                        font=dict(size=15, color="#e2e8f0"),
+                        text=f"{emoji} {tipo} ({unidade})",
+                        font=dict(size=14, color="#1c2b3e", family="Outfit"),
                     ),
-                    template="plotly_dark",
-                    paper_bgcolor="rgba(17,24,39,0.5)",
-                    plot_bgcolor="rgba(10,14,26,0.5)",
-                    height=300,
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    height=280,
                     margin=dict(l=40, r=20, t=50, b=40),
                     xaxis=dict(
                         showgrid=True,
-                        gridcolor="rgba(30,41,59,0.8)",
+                        gridcolor="rgba(28, 43, 62, 0.06)",
                         title="Data",
-                        title_font=dict(color="#64748b"),
+                        title_font=dict(color="#5c6e84", size=11),
+                        tickfont=dict(color="#5c6e84", size=10),
                     ),
                     yaxis=dict(
                         showgrid=True,
-                        gridcolor="rgba(30,41,59,0.8)",
-                        title=f"{unidade}",
-                        title_font=dict(color="#64748b"),
+                        gridcolor="rgba(28, 43, 62, 0.06)",
+                        title_font=dict(color="#5c6e84", size=11),
+                        tickfont=dict(color="#5c6e84", size=10),
                     ),
                     hoverlabel=dict(
-                        bgcolor="#111827",
-                        bordercolor="#0d7377",
-                        font=dict(color="#e2e8f0"),
+                        bgcolor="#ffffff",
+                        bordercolor="#1c2b3e",
+                        font=dict(color="#1c2b3e"),
                     ),
                 )
+                
+                # Envolver o gráfico no nosso design de card glassmorphism
+                st.markdown('<div class="premium-card" style="padding: 1.5rem !important;">', unsafe_allow_html=True)
                 st.plotly_chart(fig, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("Dados de data insuficientes para gerar gráficos.")
 
@@ -347,14 +302,15 @@ if pesquisar and numero_utente.strip():
             height=400,
         )
 
+        st.markdown("<br>", unsafe_allow_html=True)
         # Export CSV
         csv = df_display.to_csv(index=False, sep=";").encode("utf-8-sig")
         st.download_button(
-            "⬇️ Exportar CSV",
+            "Exportar CSV",
             data=csv,
             file_name=f"sinais_vitais_{numero_utente}.csv",
             mime="text/csv",
         )
 
 elif pesquisar and not numero_utente.strip():
-    st.warning("⚠️ Introduz o N.º de Utente SNS para pesquisar.")
+    st.warning("Introduza o N.º de Utente SNS para pesquisar.")

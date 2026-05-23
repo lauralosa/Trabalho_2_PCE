@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 api_client.py — Encapsula todas as chamadas HTTP ao FastAPI middleware.
 Todas as funções recebem os headers de autenticação como parâmetro.

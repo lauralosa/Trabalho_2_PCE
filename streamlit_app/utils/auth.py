@@ -1,3 +1,4 @@
+from __future__ import annotations
 import streamlit as st
 import requests
 import os
@@ -21,7 +22,7 @@ def do_login(username: str, password: str) -> dict | None:
             return response.json()
         return None
     except requests.exceptions.ConnectionError:
-        st.error("❌ Não foi possível ligar ao servidor FastAPI. Verifica se está a correr.")
+        st.error("Não foi possível ligar ao servidor FastAPI. Verifique se está a correr.")
         return None
 
 
@@ -33,12 +34,14 @@ def show_login_sidebar():
     """
     st.sidebar.markdown(
         """
-        <div style='text-align:center; padding: 12px 0 20px 0;'>
-            <span style='font-size:2.5rem;'>🏥</span>
-            <h2 style='margin:0; color:#0d7377; font-size:1.1rem; font-weight:700;'>
-                PCE — Processo Clínico Eletrónico
+        <div style='text-align:center; padding: 20px 0 25px 0;'>
+            <h2 style='margin:0; color:#1c2b3e; font-size:1.3rem; font-weight:700; font-family: Outfit;'>
+                PCE
             </h2>
-            <p style='margin:0; color:#64748b; font-size:0.75rem;'>
+            <p style='margin:2px 0 0 0; color:#5c6e84; font-size:0.8rem; font-weight: 500;'>
+                Processo Clínico Eletrónico
+            </p>
+            <p style='margin:0; color:#8fa0b5; font-size:0.7rem;'>
                 Universidade do Minho
             </p>
         </div>
@@ -48,15 +51,15 @@ def show_login_sidebar():
 
     # Já está autenticado
     if "token" in st.session_state and st.session_state.token:
-        st.sidebar.success(f"✅ Autenticado como **{st.session_state.username}**")
-        if st.sidebar.button("🚪 Terminar Sessão", use_container_width=True):
+        st.sidebar.success(f"Autenticado como **{st.session_state.username}**")
+        if st.sidebar.button("Terminar Sessão", use_container_width=True):
             for key in ["token", "username"]:
                 st.session_state.pop(key, None)
             st.rerun()
         return True
 
     # Formulário de login
-    st.sidebar.markdown("### 🔐 Entrar")
+    st.sidebar.markdown("### Entrar")
     with st.sidebar.form("login_form", clear_on_submit=False):
         username = st.text_input("Utilizador", value="admin", key="login_username")
         password = st.text_input("Password", type="password", key="login_password")
@@ -81,7 +84,7 @@ def require_auth():
     """
     authenticated = show_login_sidebar()
     if not authenticated:
-        st.info("👈 Faz login na barra lateral para continuar.")
+        st.info("Efetue o login na barra lateral para continuar.")
         st.stop()
     return st.session_state.token
 
