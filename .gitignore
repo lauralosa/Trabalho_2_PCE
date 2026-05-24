@@ -1,26 +1,26 @@
-# Ambientes Virtuais
+# Ambientes Virtuais Python
 venv/
 env/
 .venv/
 
-# Python
+# Cache e ficheiros compilados do Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+*.pyc
+*.pyo
+*.pyd
 
-# Ficheiros de configuração locais
+# Configurações do Docker / Variáveis de ambiente
 .env
 .env.local
 
-# Ficheiros do Sistema Operativo
-.DS_Store
-Thumbs.db
-
-# Ficheiros gerados pelo editor (VS Code, PyCharm, etc)
+# Ficheiros de IDEs (VS Code, PyCharm, etc.)
 .vscode/
 .idea/
+*.swp
 
-# Outros
+# Bases de dados locais (se usarem SQLite nalgum teste)
+*.sqlite3
+*.db
+
+# Logs
 *.log
