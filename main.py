@@ -17,8 +17,8 @@ HAPI_URL = os.getenv("FHIR_SERVER_URL", "http://localhost:9090/fhir")
 EHRBASE_URL = os.getenv("EHRBASE_URL", "http://localhost:8085/ehrbase/rest/openehr/v1")
 EHRBASE_USER = "admin-user"
 EHRBASE_PASS = "RequirementPassword"
-# Autenticação básica para o EHRbase
-EHR_AUTH = (EHRBASE_USER, EHRBASE_PASS)
+# Autenticação básica para o EHRbase (Desativada pelo SECURITY_AUTHTYPE: none no docker)
+EHR_AUTH = None
 
 
 # ==========================================
@@ -38,7 +38,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 app = FastAPI(title="Middleware FHIR R4 - Universidade do Minho")
 
 def get_db_connection():
-    return psycopg2.connect(host="localhost", port="5432", database="clinica_db", user="user", password="password")
+    db_host = os.getenv("DB_HOST", "localhost")
+    return psycopg2.connect(host=db_host, port="5432", database="clinica_db", user="user", password="password")
 
 
 # ==========================================
@@ -468,25 +469,13 @@ async def get_observation_by_id(id: str, user: str = Depends(get_current_user)):
         raise HTTPException(status_code=502, detail=f"Servidor HAPI FHIR inacessível: {str(e)}")
 
 
-MAPA_SINAIS_VITAIS = {
-    "8480-6": {"nome": "Pressão arterial sistólica", "archetype": "openEHR-EHR-OBSERVATION.blood_pressure.v1", "node": "at0004"},
-    "8462-4": {"nome": "Pressão arterial diastólica", "archetype": "openEHR-EHR-OBSERVATION.blood_pressure.v1", "node": "at0005"},
-    "8867-4": {"nome": "Frequência cardíaca", "archetype": "openEHR-EHR-OBSERVATION.pulse.v1", "node": "at0004"},
-    "8310-5": {"nome": "Temperatura corporal", "archetype": "openEHR-EHR-OBSERVATION.body_temperature.v1", "node": "at0004"},
-    "59408-5": {"nome": "Saturação de oxigénio", "archetype": "openEHR-EHR-OBSERVATION.pulse_oximetry.v1", "node": "at0004"},
-    "29463-7": {"nome": "Peso corporal", "archetype": "openEHR-EHR-OBSERVATION.body_weight.v1", "node": "at0004"},
-    "9279-1": {"nome": "Frequência respiratória", "archetype": "openEHR-EHR-OBSERVATION.respiration.v1", "node": "at0004"}
-}
-
-
-
 
 def garantir_ehr(numero_utente: str, patient_fhir_id: str):
     """
     Verifica se existe EHR para o utente. Se não, cria-o com ligação bidirecional[cite: 54, 56].
     """
     # Consulta se já existe EHR para este subject_id [cite: 54]
-    search_url = f"{EHRBASE_URL}/ehr?subject_id={numero_utente}&subject_namespace=pt.sns.utente"
+    search_url = f"{EHRBASE_URL}/ehr?subject_id={patient_fhir_id}&subject_namespace=pt_sns_utente"
     res = requests.get(search_url, auth=EHR_AUTH)
    
     if res.status_code == 200:
@@ -495,92 +484,220 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str):
     # Caso não exista, cria o EHR registando o Patient.id como externalId [cite: 55, 56]
     payload = {
         "_type": "EHR_STATUS",
+        "archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+        "name": {"_type": "DV_TEXT", "value": "EHR Status"},
         "subject": {
             "external_ref": {
                 "id": {"_type": "GENERIC_ID", "value": patient_fhir_id, "scheme": "fhir"},
-                "namespace": "pt.sns.utente",
+                "namespace": "pt_sns_utente",
                 "type": "PERSON"
             }
         },
         "is_queryable": True,
         "is_modifiable": True
     }
-    create_res = requests.post(f"{EHRBASE_URL}/ehr", json=payload, auth=EHR_AUTH)
+    headers = {"Prefer": "return=representation", "Content-Type": "application/json"}
+    create_res = requests.post(f"{EHRBASE_URL}/ehr", json=payload, auth=EHR_AUTH, headers=headers)
+    
+    # Melhoria 1: Prevenir crash 409
+    if create_res.status_code == 409:
+        print(f"[WEBHOOK] Conflito 409 para utente {numero_utente}. A tentar recuperar EHR existente...")
+        retry = requests.get(search_url, auth=EHR_AUTH)
+        if retry.status_code == 200:
+            return retry.json()['ehr_id']['value']
+            
     create_res.raise_for_status()
     return create_res.json()['ehr_id']['value']
 
 
+MAPA_SINAIS_VITAIS = {
+    "8480-6": {
+        "nome": "Systolic",
+        "archetype": "openEHR-EHR-OBSERVATION.blood_pressure.v2",
+        "history_node": "at0001",
+        "event_node": "at0006",   # "Any event" no blood_pressure
+        "data_node": "at0003",
+        "item_node": "at0004",
+        "unidade": "mm[Hg]",
+    },
+    "8462-4": {
+        "nome": "Diastolic",
+        "archetype": "openEHR-EHR-OBSERVATION.blood_pressure.v2",
+        "history_node": "at0001",
+        "event_node": "at0006",
+        "data_node": "at0003",
+        "item_node": "at0005",
+        "unidade": "mm[Hg]",
+    },
+    "8867-4": {
+        "nome": "Rate",
+        "archetype": "openEHR-EHR-OBSERVATION.pulse.v2",
+        "history_node": "at0002",
+        "event_node": "at0003",   # "Any event" no pulse
+        "data_node": "at0001",
+        "item_node": "at0004",
+        "unidade": "/min",
+    },
+    "8310-5": {
+        "nome": "Temperature",
+        "archetype": "openEHR-EHR-OBSERVATION.body_temperature.v2",
+        "history_node": "at0002",
+        "event_node": "at0003",   # "Any event" no body_temperature
+        "data_node": "at0001",
+        "item_node": "at0004",
+        "unidade": "Cel",
+    },
+    "59408-5": {
+        "nome": "SpO₂",
+        "archetype": "openEHR-EHR-OBSERVATION.pulse_oximetry.v1",
+        "history_node": "at0001",
+        "event_node": "at0002",   # "Any event" no pulse_oximetry
+        "data_node": "at0003",
+        "item_node": "at0006",
+        "unidade": "%",
+    },
+    "29463-7": {
+        "nome": "Weight",
+        "archetype": "openEHR-EHR-OBSERVATION.body_weight.v2",
+        "history_node": "at0002",
+        "event_node": "at0003",   # "Any event" no body_weight
+        "data_node": "at0001",
+        "item_node": "at0004",
+        "unidade": "kg",
+    },
+    "9279-1": {
+        "nome": "Rate",
+        "archetype": "openEHR-EHR-OBSERVATION.respiration.v2",
+        "history_node": "at0001",
+        "event_node": "at0002",   # "Any event" no respiration
+        "data_node": "at0003",
+        "item_node": "at0004",
+        "unidade": "/min",
+    },
+}
+
 def build_openehr_composition(fhir_obs: dict, practitioner_info: dict):
     """
-    Mapeia Observation FHIR para Composição openEHR[cite: 36, 63].
+    Mapeia Observation FHIR para Composição openEHR adaptada ao .opt v2 da equipa.
     """
-    # Extração do código LOINC [cite: 44]
     try:
+        valor_medicao = fhir_obs.get('valueQuantity', {}).get('value')
+        data_execucao = fhir_obs.get('effectiveDateTime')
+
+        # Extrair LOINC
         loinc = fhir_obs.get('code', {}).get('coding', [{}])[0].get('code')
-    except (IndexError, KeyError):
-        return None
+        if not loinc:
+            return None
 
+        info = MAPA_SINAIS_VITAIS.get(loinc)
+        if not info:
+            return None
 
-    info = MAPA_SINAIS_VITAIS.get(loinc)
-    if not info:
-        return None
+        # Remover 'Z' da data para o Java do EHRbase não falhar
+        if data_execucao and data_execucao.endswith('Z'):
+            data_execucao = data_execucao.replace('Z', '')
 
+        # Regra especial para Saturação (Proportion vs Quantity)
+        if loinc == "59408-5":
+            value_block = {
+                "_type": "DV_PROPORTION",
+                "numerator": float(valor_medicao) if valor_medicao else 0.0,
+                "denominator": 100.0,
+                "type": 3
+            }
+        else:
+            value_block = {
+                "_type": "DV_QUANTITY",
+                "magnitude": float(valor_medicao) if valor_medicao else 0.0,
+                "units": fhir_obs.get('valueQuantity', {}).get('unit', info['unidade'])
+            }
 
-    composer = {
-        "_type": "PARTY_IDENTIFIED", 
-        "name": practitioner_info.get("nome", "Desconhecido")
-    }
-    if practitioner_info.get("cedula"):
-        composer["external_ref"] = {
-            "id": {"_type": "GENERIC_ID", "value": practitioner_info["cedula"], "scheme": practitioner_info.get("sistema", "fhir")},
-            "namespace": "pt.ordem",
-            "type": "PERSON"
+        nome_medico = practitioner_info.get("nome", "Desconhecido")
+        fhir_medico_id = practitioner_info.get("cedula", "Desconhecido")
+
+        composer_block = {
+            "_type": "PARTY_IDENTIFIED",
+            "name": nome_medico,
+            "external_ref": {
+                "_type": "PARTY_REF",
+                "id": {"_type": "GENERIC_ID", "value": str(fhir_medico_id), "scheme": "fhir"},
+                "namespace": "pt-cedula-profissional",
+                "type": "ORGANISATION"
+            }
         }
 
-    # Estrutura Canonical JSON
-    return {
-        "_type": "COMPOSITION",
-        "name": {"_type": "DV_TEXT", "value": "Sinais Vitais"},
-        "archetype_details": {
-            "archetype_id": "openEHR-EHR-COMPOSITION.encounter.v1",
-            "template_id": "Sinais vitais", # Deve coincidir com o teu .opt
-            "rm_version": "1.0.4"
-        },
-        "language": {"code_string": "pt", "terminology_id": {"value": "ISO_639-1"}},
-        "territory": {"code_string": "PT", "terminology_id": {"value": "ISO_3166-1"}},
-        "category": {"value": "event", "defining_code": {"terminology_id": {"value": "openehr"}, "code_string": "433"}},
-        "composer": composer, # Requisito 4.3 [cite: 61]
-        "content": [{
-            "_type": "OBSERVATION",
-            "name": {"_type": "DV_TEXT", "value": info["nome"]},
-            "archetype_node_id": info["archetype"],
-            "data": {
-                "_type": "HISTORY",
-                "name": {"_type": "DV_TEXT", "value": "history"},
-                "origin": {"_type": "DV_DATE_TIME", "value": fhir_obs.get('effectiveDateTime')},
-                "events": [{
-                    "_type": "POINT_EVENT",
-                    "name": {"_type": "DV_TEXT", "value": "any event"},
-                    "time": {"_type": "DV_DATE_TIME", "value": fhir_obs.get('effectiveDateTime')},
+        # Construção final da Composição
+        return {
+            "_type": "COMPOSITION",
+            "archetype_node_id": "openEHR-EHR-COMPOSITION.encounter.v1",
+            "name": {"_type": "DV_TEXT", "value": "Sinais vitais"},
+            "archetype_details": {
+                "_type": "ARCHETYPED",
+                "archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-COMPOSITION.encounter.v1"},
+                "template_id": {"_type": "TEMPLATE_ID", "value": "Sinais vitais"},
+                "rm_version": "1.0.4"
+            },
+            "language": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "ISO_639-1"}, "code_string": "en"},
+            "territory": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "ISO_3166-1"}, "code_string": "PT"},
+            "category": {
+                "_type": "DV_CODED_TEXT", "value": "event",
+                "defining_code": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "openehr"}, "code_string": "433"}
+            },
+            "composer": composer_block,
+            "context": {
+                "_type": "EVENT_CONTEXT",
+                "start_time": {"_type": "DV_DATE_TIME", "value": data_execucao},
+                "setting": {
+                    "_type": "DV_CODED_TEXT", "value": "secondary medical care",
+                    "defining_code": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "openehr"}, "code_string": "232"}
+                }
+            },
+            "content": [
+                {
+                    "_type": "OBSERVATION",
+                    "archetype_node_id": info["archetype"],
+                    "name": {"_type": "DV_TEXT", "value": info["nome"]},
+                    "archetype_details": {
+                        "_type": "ARCHETYPED",
+                        "archetype_id": {"_type": "ARCHETYPE_ID", "value": info["archetype"]},
+                        "rm_version": "1.0.4"
+                    },
+                    "language": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "ISO_639-1"}, "code_string": "en"},
+                    "encoding": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "IANA_character-sets"}, "code_string": "UTF-8"},
+                    "subject": {"_type": "PARTY_SELF"},
                     "data": {
-                        "_type": "ITEM_TREE",
-                        "name": {"_type": "DV_TEXT", "value": "tree"},
-                        "items": [{
-                            "_type": "ELEMENT",
-                            "name": {"_type": "DV_TEXT", "value": info["nome"]},
-                            "archetype_node_id": info["node"],
-                            "value": {
-                                "_type": "DV_QUANTITY",
-                                "magnitude": fhir_obs.get('valueQuantity', {}).get('value'),
-                                "units": fhir_obs.get('valueQuantity', {}).get('unit')
+                        "_type": "HISTORY",
+                        "archetype_node_id": info["history_node"],  
+                        "name": {"_type": "DV_TEXT", "value": "History"},
+                        "origin": {"_type": "DV_DATE_TIME", "value": data_execucao},
+                        "events": [
+                            {
+                                "_type": "POINT_EVENT", # <-- CORRIGIDO AQUI!
+                                "archetype_node_id": info["event_node"],  
+                                "name": {"_type": "DV_TEXT", "value": "Any event"},
+                                "time": {"_type": "DV_DATE_TIME", "value": data_execucao},
+                                "data": {
+                                    "_type": "ITEM_TREE",
+                                    "archetype_node_id": info["data_node"],
+                                    "name": {"_type": "DV_TEXT", "value": "Tree"},
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": info["item_node"],
+                                            "name": {"_type": "DV_TEXT", "value": info["nome"]},
+                                            "value": value_block
+                                        }
+                                    ]
+                                }
                             }
-                        }]
+                        ]
                     }
-                }]
-            }
-        }]
-    }
-
+                }
+            ]
+        }
+    except Exception as e:
+        print(f"❌ Erro crítico ao construir composição openEHR: {e}")
+        return None
 
 def obter_dados_medico_fhir(ref: str):
     """
@@ -702,7 +819,8 @@ async def receive_observation_webhook(observation: dict):
     # 6. Gravar Composição no EHRbase
     try:
         comp_url = f"{EHRBASE_URL}/ehr/{ehr_id}/composition"
-        comp_res = requests.post(comp_url, json=composition, auth=EHR_AUTH)
+        headers = {"Prefer": "return=representation", "Content-Type": "application/json"}
+        comp_res = requests.post(comp_url, json=composition, auth=EHR_AUTH, headers=headers)
         comp_res.raise_for_status()
         comp_id = comp_res.json().get('uid', {}).get('value')
         print(f"[WEBHOOK] SUCESSO: Composição gravada no EHRbase com ID: {comp_id}")
@@ -710,6 +828,57 @@ async def receive_observation_webhook(observation: dict):
     except Exception as e:
         print(f"[WEBHOOK] Falha ao gravar Composition: {str(e)}")
         raise HTTPException(status_code=502, detail=f"Falha ao gravar Composition: {str(e)}")
+
+
+#=========================================================
+# DESAFIO EXTRA: Operação Inversa
+#=========================================================
+
+@app.get("/ehr/{ehr_id}/observations", tags=["Desafios Extra"])
+async def recuperar_observacoes_fhir_por_ehr(ehr_id: str):
+    """
+    Operação Inversa: Dado um ehr_id no EHRbase, recupera as Observations correspondentes no HAPI FHIR.
+    """
+    # 1. Obter o EHR Status do EHRbase
+    url_ehr = f"{EHRBASE_URL}/ehr/{ehr_id}/ehr_status"
+    headers = {"Accept": "application/json"}
+    
+    try:
+        ehr_res = requests.get(url_ehr, headers=headers, auth=EHR_AUTH, timeout=5)
+        if ehr_res.status_code == 404:
+            raise HTTPException(status_code=404, detail="EHR não encontrado no EHRbase.")
+        ehr_res.raise_for_status()
+        ehr_data = ehr_res.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro ao comunicar com EHRbase: {str(e)}")
+
+    # 2. Extrair o Patient ID do FHIR guardado no EHRbase
+    try:
+        # Quando criámos o EHR, guardámos o fhir_patient_id no 'external_ref'
+        fhir_patient_id = ehr_data["subject"]["external_ref"]["id"]["value"]
+    except KeyError:
+        raise HTTPException(status_code=400, detail="EHR encontrado, mas não tem ligação a um doente no FHIR (external_ref ausente).")
+        
+    # 3. Pesquisar Observations no HAPI FHIR para este doente
+    url_fhir = f"{HAPI_URL}/Observation?subject=Patient/{fhir_patient_id}"
+    try:
+        fhir_res = requests.get(url_fhir, timeout=5)
+        fhir_res.raise_for_status()
+        fhir_data = fhir_res.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro ao comunicar com HAPI FHIR: {str(e)}")
+        
+    observations = [entry.get("resource") for entry in fhir_data.get("entry", []) if entry.get("resource")]
+    
+    return {
+        "status": "sucesso",
+        "ehr_id": ehr_id,
+        "fhir_patient_id": fhir_patient_id,
+        "total_observations": len(observations),
+        "observations": observations
+    }
 
 
 #=========================================================
@@ -751,7 +920,7 @@ async def carregar_template_ehrbase():
             import time
             time.sleep(5) # Espera 5 segundos antes de tentar outra vez
 
-    # 2. VERIFICAÇÃO DO HAPI FHIR (Como a tua colega fez)
+    # 2. VERIFICAÇÃO DO HAPI FHIR 
     print("--- Verificando Servidor FHIR ---")
     try:
         res = requests.get(f"{HAPI_URL}/metadata", timeout=3)
