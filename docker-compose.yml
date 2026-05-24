@@ -18,9 +18,9 @@ services:
     ports:
       - "9090:8080"
     volumes:
-      - .:/fhir8080"
+      - .:/fhir8080
 
-# ----------------------------------------------------
+  # ----------------------------------------------------
   #  EHRBASE
   # ----------------------------------------------------
 
@@ -32,7 +32,9 @@ services:
       POSTGRES_USER: ehrbase
       POSTGRES_PASSWORD: ehrbase
     ports:
-      - "5433:5432" 
+      - "5433:5432"
+    volumes:
+      - ./init-ehr.sql:/docker-entrypoint-initdb.d/init-ehr.sql
 
   # Servidor EHRbase
   ehrbase:
@@ -40,7 +42,7 @@ services:
     depends_on:
       - ehrbase-db
     ports:
-      - "8081:8080"
+      - "8085:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://ehrbase-db:5432/ehrbase
       SPRING_DATASOURCE_USERNAME: ehrbase
@@ -49,6 +51,7 @@ services:
       SPRING_FLYWAY_PASSWORD: ehrbase
       SECURITY_AUTHTYPE: none
 
+  # API de Integração
   api:
     build: .
     container_name: integration-service
@@ -61,8 +64,8 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=clinica_db  
-      - DB_USER=user       
-      - DB_PASS=password    
-      - EHRBASE_URL=http://ehrbase:8081/ehrbase/rest/openehr/v1
+      - DB_NAME=clinica_db
+      - DB_USER=user
+      - DB_PASS=password
+      - EHRBASE_URL=http://ehrbase:8080/ehrbase/rest/openehr/v1
       - FHIR_SERVER_URL=http://hapi-fhir:8080/fhir

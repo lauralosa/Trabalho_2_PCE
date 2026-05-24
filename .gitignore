@@ -1,0 +1,26 @@
+# Ambientes Virtuais Python
+venv/
+env/
+.venv/
+
+# Cache e ficheiros compilados do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Configurações do Docker / Variáveis de ambiente
+.env
+.env.local
+
+# Ficheiros de IDEs (VS Code, PyCharm, etc.)
+.vscode/
+.idea/
+*.swp
+
+# Bases de dados locais (se usarem SQLite nalgum teste)
+*.sqlite3
+*.db
+
+# Logs
+*.log
