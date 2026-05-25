@@ -1,0 +1,27 @@
+{
+  "resourceType": "Observation",
+  "id": "obs-3",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2026-05-25T11:33:24.075+00:00"
+  },
+  "status": "final",
+  "code": {
+    "coding": [ {
+      "system": "http://loinc.org",
+      "code": "8867-4",
+      "display": "Heart rate"
+    } ],
+    "text": "Heart rate"
+  },
+  "subject": {
+    "reference": "Patient/pat-5"
+  },
+  "effectiveDateTime": "2026-05-25T12:33:24Z",
+  "valueQuantity": {
+    "value": 160.0,
+    "unit": "/min",
+    "system": "http://unitsofmeasure.org",
+    "code": "/min"
+  }
+}

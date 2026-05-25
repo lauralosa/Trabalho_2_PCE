@@ -12,7 +12,7 @@ from utils.api_client import criar_profissional, pesquisar_profissionais
 from utils.style import apply_custom_style
 
 # ─── Configuração ────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Profissionais — PCE", page_icon="👨‍⚕️", layout="wide")
+st.set_page_config(page_title="Profissionais — SyncHealth", page_icon="👩‍⚕️", layout="wide")
 
 # Aplicar estilo premium global
 apply_custom_style()
@@ -189,9 +189,9 @@ with tab_pesquisar:
 
                     st.markdown(
                         f"""
-                        <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important; background: rgba(255,255,255,0.75) !important;">
-                            <strong style="color:#1c2b3e; font-size:1.1rem; font-family:'Outfit';">{pnome}</strong> &nbsp;
-                            <span style="color:#5c6e84; font-size:0.85rem;">(ID: {pid})</span><br>
+                        <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important;">
+                            <strong style="font-size:1.1rem; font-family:'Outfit';">{pnome}</strong> &nbsp;
+                            <span style="font-size:0.85rem;">(ID: {pid})</span><br>
                             <span class="tag-badge" style="margin-top: 0.4rem;">{pesp}</span>
                         </div>
                         """,

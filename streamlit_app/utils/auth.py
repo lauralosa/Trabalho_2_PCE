@@ -35,13 +35,14 @@ def show_login_sidebar():
     st.sidebar.markdown(
         """
         <div style='text-align:center; padding: 20px 0 25px 0;'>
-            <h2 style='margin:0; color:#1c2b3e; font-size:1.3rem; font-weight:700; font-family: Outfit;'>
-                PCE
+            <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚕️</div>
+            <h2 style='margin:0; font-size:1.3rem; font-weight:700; font-family: Outfit;'>
+                SyncHealth
             </h2>
-            <p style='margin:2px 0 0 0; color:#5c6e84; font-size:0.8rem; font-weight: 500;'>
-                Processo Clínico Eletrónico
+            <p style='margin:2px 0 0 0; font-size:0.8rem; font-weight: 500;'>
+                Plataforma de Integração Clínica
             </p>
-            <p style='margin:0; color:#8fa0b5; font-size:0.7rem;'>
+            <p style='margin:10px 0 0 0; font-size:0.7rem;'>
                 Universidade do Minho
             </p>
         </div>

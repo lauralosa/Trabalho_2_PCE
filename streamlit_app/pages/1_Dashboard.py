@@ -23,7 +23,7 @@ from utils.ehrbase_client import (
 
 # ─── Configuração ────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Dashboard — PCE",
+    page_title="Dashboard — SyncHealth",
     page_icon="📊",
     layout="wide",
 )
@@ -41,8 +41,8 @@ headers = get_auth_headers()
 st.markdown(
     """
     <div class="premium-card">
-        <h1 style="font-size: 1.8rem; font-weight: 700; color: #1c2b3e; margin:0;">Dashboard de Sinais Vitais</h1>
-        <p style="margin: 0.3rem 0 0 0; color: #5c6e84; font-size: 0.9rem;">Consulta de histórico clínico integrado por número de utente SNS</p>
+        <h1 style="font-size: 1.8rem; font-weight: 700; margin:0;">Dashboard de Sinais Vitais</h1>
+        <p style="margin: 0.3rem 0 0 0; font-size: 0.9rem;">Consulta de histórico clínico integrado por número de utente SNS</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -66,13 +66,11 @@ st.markdown("<br>", unsafe_allow_html=True)
 if pesquisar and numero_utente.strip():
     numero_utente = numero_utente.strip()
 
-    # 1. Verificar se existe EHR no EHRbase
-    with st.spinner("A consultar o EHRbase..."):
-        ehr = get_ehr_by_subject(numero_utente)
-
-    # 2. Buscar dados do paciente no FHIR
+    # 1. Buscar dados do paciente no FHIR (necessário para obter o FHIR Patient ID
+    #    que é o subject_id com que o backend criou o EHR no EHRbase)
     import requests as req
     patient_info = None
+    patient_fhir_id = None
     try:
         r = req.get(
             f"{HAPI_URL}/Patient",
@@ -84,8 +82,16 @@ if pesquisar and numero_utente.strip():
             entries = bundle.get("entry", [])
             if entries:
                 patient_info = entries[0]["resource"]
+                patient_fhir_id = patient_info.get("id", "")  # ex: "pat-1"
     except Exception:
         pass
+
+    # 2. Verificar se existe EHR no EHRbase usando o FHIR Patient ID como subject_id
+    #    (o backend guardou o EHR com subject_id=patient_fhir_id e namespace=pt_sns_utente)
+    ehr = None
+    if patient_fhir_id:
+        with st.spinner("A consultar o EHRbase..."):
+            ehr = get_ehr_by_subject(patient_fhir_id)
 
     # ── Informação do Paciente ────────────────────────────────────────────────
     if patient_info:
@@ -105,9 +111,9 @@ if pesquisar and numero_utente.strip():
                             <span style="font-size:2.5rem;">{'👩' if genero.lower() in ['female','feminino','f'] else '👨'}</span>
                         </td>
                         <td style="vertical-align:middle;">
-                            <strong style="font-size:1.3rem; color:#1c2b3e; font-family:'Outfit';">{nome}</strong><br>
-                            <span style="color:#5c6e84; font-size:0.88rem; line-height:1.6;">
-                                SNS: <strong style="color:#1c2b3e;">{numero_utente}</strong> &nbsp;·&nbsp;
+                            <strong style="font-size:1.3rem; font-family:'Outfit';">{nome}</strong><br>
+                            <span style="font-size:0.88rem; line-height:1.6;">
+                                SNS: <strong>{numero_utente}</strong> &nbsp;·&nbsp;
                                 Género: {genero} &nbsp;·&nbsp;
                                 FHIR ID: {fhir_id} &nbsp;·&nbsp;
                                 Telemóvel: {contacto_tel} &nbsp;·&nbsp;
@@ -115,10 +121,10 @@ if pesquisar and numero_utente.strip():
                             </span>
                         </td>
                         <td style="text-align:right; vertical-align:middle;">
-                            <span style="background:{'rgba(28,43,62,0.06)' if ehr else 'rgba(239,68,68,0.1)'}; 
-                                   border:1px solid {'rgba(28,43,62,0.15)' if ehr else '#ef4444'};
+                            <span class="tag-badge" style="background: {'rgba(6, 182, 212, 0.1)' if ehr else 'rgba(239,68,68,0.1)'} !important; 
+                                   border: 1px solid {'rgba(6, 182, 212, 0.3)' if ehr else 'rgba(239,68,68,0.3)'} !important; 
                                    border-radius:20px; padding:6px 14px; font-size:0.8rem; font-weight:600;
-                                   color:{'#1c2b3e' if ehr else '#ef4444'};">
+                                   color:{'var(--accent-cyan)' if ehr else '#ef4444'};">
                                 {'EHR Ativo' if ehr else 'Sem Registo EHR'}
                             </span>
                         </td>
@@ -136,9 +142,9 @@ if pesquisar and numero_utente.strip():
     registos = []
     fonte = "EHRbase"
 
-    if ehr:
+    if ehr and patient_fhir_id:
         with st.spinner("A consultar sinais vitais no EHRbase (AQL)..."):
-            registos = query_sinais_vitais_aql(numero_utente)
+            registos = query_sinais_vitais_aql(patient_fhir_id)
 
     if not registos:
         with st.spinner("A consultar sinais vitais no HAPI FHIR..."):
@@ -200,13 +206,12 @@ if pesquisar and numero_utente.strip():
         with cols_cards[col_idx]:
             st.markdown(
                 f"""
-                <div class="premium-card" style="text-align: center; padding: 1.2rem !important; margin-bottom: 1rem !important;">
-                    <div style="font-size: 1.8rem; margin-bottom: 0.3rem;">{emoji}</div>
-                    <div style="font-size: 0.75rem; font-weight: 600; color: #5c6e84; text-transform: uppercase; letter-spacing: 0.5px; height: 35px; overflow: hidden; display: flex; align-items: center; justify-content: center;">{tipo}</div>
-                    <div style="font-size: 2.2rem; font-weight: 700; color: #1c2b3e; line-height: 1.1; margin: 0.2rem 0; font-family:'Outfit';">
-                        {valor_fmt} <span style="font-size: 0.95rem; font-weight: 500; color: #5c6e84;">{unidade}</span>
+                <div class="premium-card" style="padding: 1rem !important; text-align: center; margin-bottom: 1rem !important; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; height: 35px; overflow: hidden; display: flex; align-items: center; justify-content: center;">{tipo}</div>
+                    <div style="font-size: 2.2rem; font-weight: 700; line-height: 1.1; margin: 0.2rem 0; font-family:'Outfit';">
+                        {valor_fmt} <span style="font-size: 0.95rem; font-weight: 500;">{unidade}</span>
                     </div>
-                    <div style="font-size: 0.7rem; color: #8fa0b5; margin-top: 0.5rem;">{data_str}</div>
+                    <div style="font-size: 0.7rem; margin-top: 0.5rem; opacity: 0.7;">{data_str}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -243,8 +248,8 @@ if pesquisar and numero_utente.strip():
                         y=df_tipo["valor"],
                         mode="lines+markers",
                         name=tipo,
-                        line=dict(color="#1c2b3e", width=2.5),
-                        marker=dict(size=8, color="#f2afc6", line=dict(color="#1c2b3e", width=1.5), symbol="circle"),
+                        line=dict(color="#06b6d4", width=2.5),
+                        marker=dict(size=8, color="#0f172a", line=dict(color="#06b6d4", width=2), symbol="circle"),
                         hovertemplate=f"<b>{tipo}</b><br>Valor: %{{y:.1f}} {unidade}<br>Data: %{{x|%d/%m/%Y %H:%M}}<extra></extra>",
                     )
                 )
@@ -252,7 +257,7 @@ if pesquisar and numero_utente.strip():
                 fig.update_layout(
                     title=dict(
                         text=f"{emoji} {tipo} ({unidade})",
-                        font=dict(size=14, color="#1c2b3e", family="Outfit"),
+                        font=dict(size=14, color="#f1f5f9", family="Outfit"),
                     ),
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
@@ -260,21 +265,21 @@ if pesquisar and numero_utente.strip():
                     margin=dict(l=40, r=20, t=50, b=40),
                     xaxis=dict(
                         showgrid=True,
-                        gridcolor="rgba(28, 43, 62, 0.06)",
+                        gridcolor="rgba(255, 255, 255, 0.05)",
                         title="Data",
-                        title_font=dict(color="#5c6e84", size=11),
-                        tickfont=dict(color="#5c6e84", size=10),
+                        title_font=dict(color="#94a3b8", size=11),
+                        tickfont=dict(color="#94a3b8", size=10),
                     ),
                     yaxis=dict(
                         showgrid=True,
-                        gridcolor="rgba(28, 43, 62, 0.06)",
-                        title_font=dict(color="#5c6e84", size=11),
-                        tickfont=dict(color="#5c6e84", size=10),
+                        gridcolor="rgba(255, 255, 255, 0.05)",
+                        title_font=dict(color="#94a3b8", size=11),
+                        tickfont=dict(color="#94a3b8", size=10),
                     ),
                     hoverlabel=dict(
-                        bgcolor="#ffffff",
-                        bordercolor="#1c2b3e",
-                        font=dict(color="#1c2b3e"),
+                        bgcolor="#1e293b",
+                        bordercolor="#06b6d4",
+                        font=dict(color="#f1f5f9"),
                     ),
                 )
                 

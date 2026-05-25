@@ -14,7 +14,7 @@ from utils.style import apply_custom_style
 import requests as req
 
 # ─── Configuração ────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Observações — PCE", page_icon="🩺", layout="wide")
+st.set_page_config(page_title="Observações — SyncHealth", page_icon="🩺", layout="wide")
 
 HAPI_URL = os.getenv("HAPI_FHIR_URL", "http://localhost:9090/fhir")
 FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:5000")
@@ -69,8 +69,8 @@ headers = get_auth_headers()
 st.markdown(
     """
     <div class="premium-card">
-        <h1 style="font-size: 1.8rem; font-weight: 700; color: #1c2b3e; margin:0;">Registo de Sinais Vitais</h1>
-        <p style="margin: 0.3rem 0 0 0; color: #5c6e84; font-size: 0.9rem;">Submissão de observações clínicas diretamente para o servidor interoperável FHIR R4</p>
+        <h1 style="font-size: 1.8rem; font-weight: 700; margin:0;">Registo de Sinais Vitais</h1>
+        <p style="margin: 0.3rem 0 0 0; font-size: 0.9rem;">Submissão de observações clínicas diretamente para o servidor interoperável FHIR R4</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -134,44 +134,50 @@ with tab_criar:
 
     st.markdown("---")
 
-    # ── Formulário principal ──────────────────────────────────────────────────
-    with st.form("form_observacao", clear_on_submit=False):
-        st.markdown("#### Passo 2 — Detalhes da Observação")
+    # ── Seleção do tipo de sinal vital FORA do form ──────────────────────────
+    # O selectbox tem de estar fora do st.form para que mudar o tipo de sinal
+    # vital acione um re-render imediato, atualizando os limites e unidade.
+    st.markdown("#### Passo 2 — Detalhes da Observação")
 
-        col_tipo, col_status = st.columns(2)
-        with col_tipo:
-            tipo_sinal = st.selectbox(
-                "Tipo de Sinal Vital *",
-                options=list(SINAIS_VITAIS.keys()),
-                help="Seleciona o tipo de medição",
-            )
-        with col_status:
-            estado = st.selectbox(
-                "Estado *",
-                options=["final", "preliminary", "registered", "amended", "corrected"],
-                help="Estado da observação clínica",
-            )
-
-        # Info do código LOINC selecionado
-        info_sv = SINAIS_VITAIS[tipo_sinal]
-        st.markdown(
-            f"""
-            <div class="loinc-info">
-                Código LOINC: <span class="loinc-code">{info_sv['loinc']}</span>
-                &nbsp;·&nbsp; Display: <em>{info_sv['display']}</em>
-                &nbsp;·&nbsp; Unidade padrão: <strong>{info_sv['unidade']}</strong>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    col_tipo, col_status_outer = st.columns(2)
+    with col_tipo:
+        tipo_sinal = st.selectbox(
+            "Tipo de Sinal Vital *",
+            options=list(SINAIS_VITAIS.keys()),
+            help="Seleciona o tipo de medição",
+            key="obs_tipo_sinal",
+        )
+    with col_status_outer:
+        estado = st.selectbox(
+            "Estado *",
+            options=["final", "preliminary", "registered", "amended", "corrected"],
+            help="Estado da observação clínica",
+            key="obs_estado",
         )
 
-        st.markdown("<br>", unsafe_allow_html=True)
+    # Info do código LOINC — atualiza imediatamente ao mudar o tipo
+    info_sv = SINAIS_VITAIS[tipo_sinal]
+    st.markdown(
+        f"""
+        <div class="loinc-info">
+            Código LOINC: <span class="loinc-code">{info_sv['loinc']}</span>
+            &nbsp;·&nbsp; Display: <em>{info_sv['display']}</em>
+            &nbsp;·&nbsp; Unidade padrão: <strong>{info_sv['unidade']}</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Formulário de medição (apenas os campos de valor/data/hora) ───────────
+    with st.form("form_observacao", clear_on_submit=False):
         st.markdown("#### Passo 3 — Medição")
 
         col_val, col_unit, col_data = st.columns(3)
         with col_val:
             valor = st.number_input(
-                f"Valor *",
+                f"Valor ({info_sv['unidade']}) *",
                 min_value=float(info_sv["min"]),
                 max_value=float(info_sv["max"]),
                 value=float((info_sv["min"] + info_sv["max"]) / 2),
@@ -307,11 +313,11 @@ with tab_consultar:
 
                     st.markdown(
                         f"""
-                        <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important; background: rgba(255,255,255,0.75) !important;">
-                            <strong style="color:#1c2b3e; font-size:1.1rem; font-family:'Outfit';">{tipo}</strong> &nbsp;
+                        <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important;">
+                            <strong style="font-size:1.1rem; font-family:'Outfit';">{tipo}</strong> &nbsp;
                             <span class="tag-badge" style="font-family:monospace;">{loinc}</span><br>
-                            <span style="color:#5c6e84; font-size:0.88rem; line-height:1.6; margin-top:0.4rem; display:block;">
-                                Medição: <strong style="color:#1c2b3e;">{valor_obs} {unidade_obs}</strong> &nbsp;·&nbsp; 
+                            <span style="font-size:0.88rem; line-height:1.6; margin-top:0.4rem; display:block;">
+                                Medição: <strong>{valor_obs} {unidade_obs}</strong> &nbsp;·&nbsp; 
                                 Data: {data_fmt} &nbsp;·&nbsp; 
                                 Estado: {status_obs} &nbsp;·&nbsp; 
                                 ID: {obs_id}

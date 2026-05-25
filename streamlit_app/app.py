@@ -8,8 +8,8 @@ from utils.style import apply_custom_style
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
-    page_title="PCE — Processo Clínico Eletrónico",
-    page_icon="🏥",
+    page_title="SyncHealth",
+    page_icon="⚕️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -23,9 +23,9 @@ is_auth = show_login_sidebar()
 # ─── Conteúdo principal ───────────────────────────────────────────────────────
 st.markdown(
     """
-    <div class="premium-card" style="text-align: center; background: rgba(255, 255, 255, 0.75) !important;">
-        <h1 style="font-size: 2.4rem; font-weight: 700; color: #1c2b3e; margin: 0 0 0.4rem 0;">Processo Clínico Eletrónico</h1>
-        <p style="font-size: 1.05rem; color: #5c6e84; margin: 0 0 1.2rem 0;">
+    <div class="premium-card" style="text-align: center;">
+        <h1 style="font-size: 2.4rem; font-weight: 700; margin: 0 0 0.4rem 0;">SyncHealth</h1>
+        <p style="font-size: 1.05rem; margin: 0 0 1.2rem 0;">
             Integração interoperável de dados médicos usando FHIR R4 e openEHR
         </p>
         <span class="tag-badge">Universidade do Minho · 2025/2026</span>
@@ -41,9 +41,8 @@ with col1:
     st.markdown(
         """
         <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.4rem;">📊</div>
-            <div style="font-weight: 700; color: #1c2b3e; font-size: 1.1rem; margin-bottom: 0.3rem;">Dashboard</div>
-            <div style="color: #5c6e84; font-size: 0.85rem;">Histórico de sinais vitais do utente consultado a partir do EHRbase</div>
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">Dashboard</div>
+            <div style="font-size: 0.85rem;">Histórico de sinais vitais do utente consultado a partir do EHRbase</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -53,9 +52,8 @@ with col2:
     st.markdown(
         """
         <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.4rem;">👤</div>
-            <div style="font-weight: 700; color: #1c2b3e; font-size: 1.1rem; margin-bottom: 0.3rem;">Pacientes</div>
-            <div style="color: #5c6e84; font-size: 0.85rem;">Registo e pesquisa de utentes no repositório clínico FHIR R4</div>
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">Pacientes</div>
+            <div style="font-size: 0.85rem;">Registo e pesquisa de utentes no repositório clínico FHIR R4</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -65,9 +63,8 @@ with col3:
     st.markdown(
         """
         <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.4rem;">👩‍⚕️</div>
-            <div style="font-weight: 700; color: #1c2b3e; font-size: 1.1rem; margin-bottom: 0.3rem;">Profissionais</div>
-            <div style="color: #5c6e84; font-size: 0.85rem;">Gestão de médicos e enfermeiros com cédula de identificação</div>
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">Profissionais</div>
+            <div style="font-size: 0.85rem;">Gestão de médicos e enfermeiros com cédula de identificação</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -77,9 +74,8 @@ with col4:
     st.markdown(
         """
         <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.4rem;">🩺</div>
-            <div style="font-weight: 700; color: #1c2b3e; font-size: 1.1rem; margin-bottom: 0.3rem;">Observações</div>
-            <div style="color: #5c6e84; font-size: 0.85rem;">Registo estruturado de novos sinais vitais por utente</div>
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">Observações</div>
+            <div style="font-size: 0.85rem;">Registo estruturado de novos sinais vitais por utente</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -95,7 +91,7 @@ import requests
 import os
 
 FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:5000")
-EHRBASE_LOCAL = os.getenv("EHRBASE_URL_LOCAL", "http://localhost:8082/ehrbase/rest/openehr/v1")
+EHRBASE_LOCAL = os.getenv("EHRBASE_URL_LOCAL", "http://localhost:8085/ehrbase/rest/openehr/v1")
 HAPI_URL = os.getenv("HAPI_FHIR_URL", "http://localhost:9090/fhir")
 
 def check_service(url, name):

@@ -6,12 +6,13 @@ Usado principalmente pelo Dashboard para consultar sinais vitais históricos.
 import requests
 import os
 
-EHRBASE_URL = os.getenv("EHRBASE_URL_LOCAL", "http://localhost:8082/ehrbase/rest/openehr/v1")
-EHRBASE_USER = "admin-user"
-EHRBASE_PASS = "RequirementPassword"
-EHR_AUTH = (EHRBASE_USER, EHRBASE_PASS)
+# Porta 8085: corresponde ao mapeamento do docker-compose.yml (porta interna 8080 → local 8085)
+# EHR_AUTH = None: o EHRbase está configurado com SECURITY_AUTHTYPE=none no docker-compose.yml,
+# pelo que não requer autenticação HTTP Basic (igual ao que o backend define em main.py)
+EHRBASE_URL = os.getenv("EHRBASE_URL_LOCAL", "http://localhost:8085/ehrbase/rest/openehr/v1")
+EHR_AUTH = None
 
-# Nomes legíveis para cada código LOINC
+# Nomes legíveis para cada código LOINC — coincide com MAPA_SINAIS_VITAIS do main.py
 MAPA_SINAIS_VITAIS = {
     "8480-6":  {"nome": "Pressão arterial sistólica",  "unidade": "mmHg", "emoji": "🩺"},
     "8462-4":  {"nome": "Pressão arterial diastólica", "unidade": "mmHg", "emoji": "🩺"},
@@ -23,15 +24,26 @@ MAPA_SINAIS_VITAIS = {
 }
 
 
-def get_ehr_by_subject(numero_utente: str) -> dict | None:
+def get_ehr_by_subject(patient_fhir_id: str) -> dict | None:
     """
-    Procura o EHR pelo N.º de Utente SNS.
-    Retorna o objeto EHR completo ou None se não existir.
+    Procura o EHR pelo FHIR Patient ID (ex: 'pat-1').
+
+    O backend (main.py → garantir_ehr) cria o EHR com:
+      subject_id        = patient_fhir_id  (ex: "pat-1")
+      subject_namespace = "pt_sns_utente"
+
+    Por isso o frontend tem de pesquisar com os mesmos valores.
+
+    Args:
+        patient_fhir_id: ID do recurso Patient no FHIR (ex: "pat-1")
+
+    Returns:
+        Dicionário com o EHR ou None se não existir / erro de ligação.
     """
     url = f"{EHRBASE_URL}/ehr"
     params = {
-        "subject_id": numero_utente,
-        "subject_namespace": "pt.sns.utente",
+        "subject_id": patient_fhir_id,        # ex: "pat-1" — igual ao que o backend gravou
+        "subject_namespace": "pt_sns_utente", # namespace definido em garantir_ehr()
     }
     try:
         r = requests.get(url, params=params, auth=EHR_AUTH, timeout=10)
@@ -58,10 +70,12 @@ def get_composicoes_por_ehr(ehr_id: str) -> list:
         return []
 
 
-def query_sinais_vitais_aql(numero_utente: str) -> list:
+def query_sinais_vitais_aql(patient_fhir_id: str) -> list:
     """
     Executa uma query AQL no EHRbase para obter todos os sinais vitais
-    de um utente identificado pelo N.º de Utente SNS.
+    de um utente identificado pelo FHIR Patient ID (ex: 'pat-1').
+
+    O namespace 'pt_sns_utente' é o que o backend usa em garantir_ehr().
 
     Retorna uma lista de dicionários com os campos:
     - tipo (nome do sinal vital)
@@ -70,7 +84,9 @@ def query_sinais_vitais_aql(numero_utente: str) -> list:
     - data (str ISO 8601)
     - ehr_id (str)
     """
-    # AQL: seleciona valor, unidade, data e nome do sinal vital
+    # AQL: seleciona valor, unidade, data e nome do sinal vital.
+    # Nota: os nós at0001/at0002/at0003/at0004 são os mais comuns nos arquétipos
+    # suportados; o fallback para FHIR cobre os casos em que a AQL não retorne dados.
     aql = f"""
     SELECT
         obs/name/value                                                         AS tipo,
@@ -81,8 +97,8 @@ def query_sinais_vitais_aql(numero_utente: str) -> list:
     FROM EHR e
         CONTAINS COMPOSITION c
         CONTAINS OBSERVATION obs
-    WHERE e/ehr_status/subject/external_ref/id/value = '{numero_utente}'
-      AND e/ehr_status/subject/external_ref/namespace = 'pt.sns.utente'
+    WHERE e/ehr_status/subject/external_ref/id/value = '{patient_fhir_id}'
+      AND e/ehr_status/subject/external_ref/namespace = 'pt_sns_utente'
     ORDER BY c/context/start_time/value DESC
     LIMIT 200
     """

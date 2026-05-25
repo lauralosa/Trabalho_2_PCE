@@ -1,0 +1,27 @@
+{
+  "resourceType": "Observation",
+  "id": "obs-2",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2026-05-25T11:28:27.388+00:00"
+  },
+  "status": "final",
+  "code": {
+    "coding": [ {
+      "system": "http://loinc.org",
+      "code": "8310-5",
+      "display": "Body temperature"
+    } ],
+    "text": "Body temperature"
+  },
+  "subject": {
+    "reference": "Patient/pat-5"
+  },
+  "effectiveDateTime": "2026-05-25T12:28:27Z",
+  "valueQuantity": {
+    "value": 38.40000000000001,
+    "unit": "Cel",
+    "system": "http://unitsofmeasure.org",
+    "code": "Cel"
+  }
+}

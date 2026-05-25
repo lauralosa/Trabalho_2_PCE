@@ -12,7 +12,7 @@ from utils.api_client import criar_paciente, pesquisar_pacientes
 from utils.style import apply_custom_style
 
 # ─── Configuração ────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Pacientes — PCE", page_icon="👤", layout="wide")
+st.set_page_config(page_title="Pacientes — SyncHealth", page_icon="👤", layout="wide")
 
 # Aplicar estilo premium global
 apply_custom_style()
@@ -210,11 +210,11 @@ with tab_pesquisar:
 
                     st.markdown(
                         f"""
-                        <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important; background: rgba(255,255,255,0.75) !important;">
-                            <strong style="color:#1c2b3e; font-size:1.1rem; font-family:'Outfit';">{pnome}</strong> &nbsp;
-                            <span style="color:#5c6e84; font-size:0.85rem;">({pid})</span><br>
-                            <span style="font-size:0.88rem; color:#5c6e84; line-height:1.6;">
-                                SNS: <strong style="color:#1c2b3e;">{sns}</strong> &nbsp;·&nbsp;
+                        <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important;">
+                            <strong style="font-size:1.1rem; font-family:'Outfit';">{pnome}</strong> &nbsp;
+                            <span style="font-size:0.85rem;">({pid})</span><br>
+                            <span style="font-size:0.88rem; line-height:1.6;">
+                                SNS: <strong>{sns}</strong> &nbsp;·&nbsp;
                                 Género: {pgenero} &nbsp;·&nbsp;
                                 Telemóvel: {tel}
                             </span>

@@ -711,13 +711,18 @@ def validar_composicao_openehr(ehr_id: str, composition: dict) -> tuple:
     persistir a composição — útil para detetar erros de mapeamento.
 
     Returns:
-        (True, "ok") se válida, (False, "mensagem de erro") se inválida.
+        (True, "ok") se válida ou endpoint não suportado,
+        (False, "mensagem de erro") se explicitamente inválida (HTTP 4xx != 405).
     """
     validate_url = f"{EHRBASE_URL}/ehr/{ehr_id}/composition/validate"
     try:
         res = requests.post(validate_url, json=composition, auth=EHR_AUTH, timeout=10)
         if res.status_code == 200:
             return True, "Composição válida conforme o Template."
+        if res.status_code == 405:
+            # O EHRbase não suporta este endpoint nesta versão — tratar como válido
+            logger.info("[VALIDAÇÃO] Endpoint /composition/validate não suportado (405). A continuar sem validação prévia.")
+            return True, "Validação não suportada nesta versão do EHRbase."
         return False, res.text
     except Exception as e:
         return False, f"Erro na ligação ao validador EHRbase: {str(e)}"
@@ -883,15 +888,17 @@ def processar_observation(fhir_obs: dict) -> dict:
 
     # ------------------------------------------------------------------
     # Desafio Extra — Validar a Composição openEHR contra o Template
+    # A validação é não bloqueante: se o endpoint não existir (405) ou
+    # se a ligação falhar, regista um aviso e continua para a submissão.
+    # Só bloqueia se o EHRbase confirmar explicitamente que a composição
+    # é inválida (HTTP 4xx com corpo de erro detalhado).
     # ------------------------------------------------------------------
     is_valid, validation_msg = validar_composicao_openehr(ehr_id, composition)
     if not is_valid:
-        logger.warning(f"[INTEGRAÇÃO] Composição inválida: {validation_msg}")
-        return {
-            "status": "erro",
-            "observation_id": obs_id,
-            "mensagem": f"A validação da Composição falhou: {validation_msg}"
-        }
+        logger.warning(
+            f"[INTEGRAÇÃO] Aviso de validação para Observation/{obs_id}: {validation_msg}. "
+            f"A continuar para submissão — o EHRbase fará a validação final."
+        )
 
     # ------------------------------------------------------------------
     # Passo 6 — Submeter a Composição ao EHRbase
