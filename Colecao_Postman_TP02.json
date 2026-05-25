@@ -1,0 +1,314 @@
+{
+  "info": {
+    "name": "TP02 - FHIR to openEHR (Final)",
+    "description": "Coleção que demonstra o fluxo completo de ponta-a-ponta pedido no enunciado.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Obter Token JWT (Login admin)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"jwt_token\", jsonData.access_token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "admin",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "1234",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/token",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. Criar Paciente com N. Utente (SNS)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "var patient_id = jsonData.id.replace('pat-', '');",
+              "pm.environment.set(\"patient_id\", patient_id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"numero_sns\": \"123456789\",\n    \"nome\": \"Helena Oliveira\",\n    \"genero\": \"feminino\",\n    \"telecom\": [\n        {\"tipo\": \"telemóvel\", \"valor\": \"912345678\"}\n    ],\n    \"contacto\": [\n        {\"nome\": \"Familiar\", \"telecom\": [{\"tipo\": \"telemóvel\", \"valor\": \"912345678\"}], \"endereco\": []}\n    ]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/Patient",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Patient"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. Criar Profissional de Saúde (Cédula)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "var prac_id = jsonData.id.replace('prac-', '');",
+              "pm.environment.set(\"practitioner_id\", prac_id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"cedula\": \"C-98765\",\n    \"nome\": \"Dr. Rui Silva\",\n    \"especialidade\": \"Cardiologia\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/Practitioner",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Practitioner"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. Criar Consulta (Encounter)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"paciente_id\": {{patient_id}},\n    \"practitioner_id\": {{practitioner_id}},\n    \"status\": \"finished\",\n    \"classe_code\": \"AMB\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/Encounter",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Encounter"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. Enviar Saturação (Dispositivo -> FHIR)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Este pedido vai diretamente ao HAPI FHIR.",
+              "// Isso faz o FHIR disparar um Webhook para a nossa API!"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/fhir+json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"resourceType\": \"Observation\",\n  \"status\": \"final\",\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://loinc.org\",\n        \"code\": \"59408-5\",\n        \"display\": \"Oxygen saturation in Arterial blood\"\n      }\n    ]\n  },\n  \"subject\": {\n    \"reference\": \"Patient/pat-{{patient_id}}\"\n  },\n  \"performer\": [\n    {\n      \"reference\": \"Practitioner/prac-{{practitioner_id}}\"\n    }\n  ],\n  \"effectiveDateTime\": \"2024-05-17T14:30:00Z\",\n  \"valueQuantity\": {\n    \"value\": 98.5,\n    \"unit\": \"%\",\n    \"system\": \"http://unitsofmeasure.org\",\n    \"code\": \"%\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{fhir_url}}/Observation",
+          "host": [
+            "{{fhir_url}}"
+          ],
+          "path": [
+            "Observation"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. (Alternativa) Enviar Sinal Vital via Middleware",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"estado\": \"final\",\n    \"codigo\": {\n        \"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8310-5\", \"display\": \"Body Temperature\"}]\n    },\n    \"referencia\": \"Patient/pat-{{patient_id}}\",\n    \"dataExecucao\": \"2024-05-17T15:00:00Z\",\n    \"medicao\": {\n        \"valor\": 36.6,\n        \"unidade\": \"Cel\",\n        \"sistema\": \"http://unitsofmeasure.org\",\n        \"code\": \"Cel\"\n    }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/Observation",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Observation"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5.5. Obter EHR ID do Paciente (Pesquisa Direta)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic YWRtaW4tdXNlcjpSZXF1aXJlbWVudFBhc3N3b3Jk"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8085/ehrbase/rest/openehr/v1/ehr?subject_id=pat-{{patient_id}}&subject_namespace=pt_sns_utente",
+          "host": [
+            "http://localhost:8085"
+          ],
+          "path": [
+            "ehrbase",
+            "rest",
+            "openehr",
+            "v1",
+            "ehr"
+          ],
+          "query": [
+            {
+              "key": "subject_id",
+              "value": "pat-{{patient_id}}"
+            },
+            {
+              "key": "subject_namespace",
+              "value": "pt_sns_utente"
+            }
+          ]
+        },
+        "description": "Faz a pesquisa diretamente ao EHRbase para descobrir o EHR ID gerado para o nosso paciente FHIR!"
+      },
+      "response": []
+    },
+    {
+      "name": "6. Obter Sinais Vitais do EHRbase (Desafio Extra)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/ehr/COLOQUE_AQUI_O_ID_DO_EHR/observations",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "ehr",
+            "COLOQUE_AQUI_O_ID_DO_EHR",
+            "observations"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "fhir_url",
+      "value": "http://localhost:9090/fhir",
+      "type": "string"
+    }
+  ]
+}
