@@ -1220,13 +1220,23 @@ async def post_paciente(data: PatientSchema, user: str = Depends(get_current_use
 
     O recurso FHIR Patient é criado com o Nº de Utente SNS no campo 'identifier',
     permitindo a ligação ao EHRbase. Requer autenticação JWT.
+
+    Usa upsert (ON CONFLICT DO UPDATE): se o Nº de Utente SNS já existir na BD
+    (situação típica após reinício do Docker quando o HAPI FHIR perde os dados),
+    o registo é atualizado e re-sincronizado com o HAPI FHIR em vez de devolver erro.
     """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        # UPSERT: INSERT ou UPDATE se o numero_sns já existir (evita erro de chave duplicada
+        # após reinício do Docker em que o HAPI FHIR perde dados mas o PostgreSQL os mantém)
         cur.execute(
             "INSERT INTO pacientes (numero_sns, nome, genero, telecom, contacto) "
-            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            "VALUES (%s, %s, %s, %s, %s) "
+            "ON CONFLICT (numero_sns) DO UPDATE SET "
+            "  nome=EXCLUDED.nome, genero=EXCLUDED.genero, "
+            "  telecom=EXCLUDED.telecom, contacto=EXCLUDED.contacto "
+            "RETURNING id",
             (data.numero_sns, data.nome, data.genero,
              json.dumps([t.dict() for t in data.telecom]),
              json.dumps([c.dict() for c in data.contacto]))
@@ -1237,7 +1247,7 @@ async def post_paciente(data: PatientSchema, user: str = Depends(get_current_use
         response = requests.put(f"{HAPI_URL}/Patient/pat-{new_id}", json=fhir_p, timeout=5)
         response.raise_for_status()
         conn.commit()
-        logger.info(f"Paciente criado: pat-{new_id} (SNS: {data.numero_sns})")
+        logger.info(f"Paciente registado/atualizado: pat-{new_id} (SNS: {data.numero_sns})")
         return fhir_p
     except requests.exceptions.RequestException as e:
         conn.rollback()
@@ -1291,12 +1301,20 @@ async def post_practitioner(data: PractitionerSchema, user: str = Depends(get_cu
     Regista um profissional de saúde na BD local e no HAPI FHIR.
     A cédula profissional é incluída no campo 'identifier' do recurso FHIR.
     Requer autenticação JWT.
+
+    Usa upsert (ON CONFLICT DO UPDATE): se a cédula já existir na BD local,
+    o registo é atualizado e re-sincronizado com o HAPI FHIR em vez de devolver erro.
     """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        # UPSERT: INSERT ou UPDATE se a cedula já existir (evita erro de chave duplicada
+        # após reinício do Docker em que o HAPI FHIR perde dados mas o PostgreSQL os mantém)
         cur.execute(
-            "INSERT INTO profissionais (cedula, nome, especialidade) VALUES (%s, %s, %s) RETURNING id",
+            "INSERT INTO profissionais (cedula, nome, especialidade) VALUES (%s, %s, %s) "
+            "ON CONFLICT (cedula) DO UPDATE SET "
+            "  nome=EXCLUDED.nome, especialidade=EXCLUDED.especialidade "
+            "RETURNING id",
             (data.cedula, data.nome, data.especialidade)
         )
         new_id = cur.fetchone()[0]
@@ -1304,7 +1322,7 @@ async def post_practitioner(data: PractitionerSchema, user: str = Depends(get_cu
         response = requests.put(f"{HAPI_URL}/Practitioner/prac-{new_id}", json=fhir_prac, timeout=5)
         response.raise_for_status()
         conn.commit()
-        logger.info(f"Practitioner criado: prac-{new_id} (cédula: {data.cedula})")
+        logger.info(f"Profissional registado/atualizado: prac-{new_id} (cédula: {data.cedula})")
         return fhir_prac
     except requests.exceptions.RequestException as e:
         conn.rollback()
