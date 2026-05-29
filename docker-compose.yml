@@ -85,6 +85,6 @@ services:
       - hapi-fhir
       - ehrbase
     environment:
-      - FASTAPI_URL=http://api:5000
+      - FASTAPI_URL=http://integration-service:5000
       - EHRBASE_URL_LOCAL=http://ehrbase:8080/ehrbase/rest/openehr/v1
       - HAPI_FHIR_URL=http://hapi-fhir:8080/fhir

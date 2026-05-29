@@ -101,7 +101,7 @@ EHRBASE_URL = os.getenv("EHRBASE_URL", "http://localhost:8085/ehrbase/rest/opene
 # e corresponde ao valor de container_name definido no docker-compose.yml.
 WEBHOOK_URL = os.getenv(
     "WEBHOOK_URL",
-    "http://integration-service:5000/webhook/fhir-observation"
+    "http://api:5000/webhook/fhir-observation"
 )
 
 # O EHRbase está configurado com SECURITY_AUTHTYPE=none no docker-compose.yml,
@@ -525,15 +525,27 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str) -> str:
             return retry.json()['ehr_id']['value']
 
     create_res.raise_for_status()
-    # O EHRbase retorna o ehr_id no header 'EHR-Id' (201 Created)
-    # O corpo pode vir vazio ou com o EHR completo dependendo da versão
-    ehr_id = create_res.headers.get("EHR-Id")
+    # O EHRbase pode usar 'EHR-Id' ou 'EHR-id' (case-sensitive varia por versão)
+    # Tentar todas as variantes do header
+    ehr_id = (
+        create_res.headers.get("EHR-Id")
+        or create_res.headers.get("EHR-id")
+        or create_res.headers.get("ehr-id")
+    )
     if not ehr_id:
-        # Fallback: tentar extrair do corpo JSON
+        # Fallback 1: tentar extrair do corpo JSON
         try:
             ehr_id = create_res.json()['ehr_id']['value']
         except Exception:
-            raise Exception(f"Não foi possível obter ehr_id da resposta do EHRbase. Status: {create_res.status_code}, Body: {create_res.text[:200]}")
+            pass
+    if not ehr_id:
+        # Fallback 2: re-pesquisar o EHR no EHRbase (foi criado com 201 mas header veio vazio)
+        logger.warning(f"Header EHR-Id não encontrado após 201. A re-pesquisar EHR para utente {numero_utente}...")
+        retry = requests.get(search_url, auth=EHR_AUTH, timeout=10)
+        if retry.status_code == 200:
+            ehr_id = retry.json()['ehr_id']['value']
+        else:
+            raise Exception(f"Não foi possível obter ehr_id da resposta do EHRbase. Status: {create_res.status_code}, Headers: {dict(create_res.headers)}, Body: {create_res.text[:300]}")
     logger.info(f"Novo EHR criado para utente SNS {numero_utente}: {ehr_id}")
     return ehr_id
 
@@ -936,7 +948,7 @@ def processar_observation(fhir_obs: dict) -> dict:
                 "ehr_id": ehr_id,
                 "composition_uid": comp_uid,
                 "numero_utente_sns": numero_utente,
-                "profissional": nome_medico
+                "profissional": practitioner_info.get("nome")
             }
         else:
             # EHRbase retorna detalhes do erro no corpo da resposta
@@ -1675,7 +1687,7 @@ async def registar_subscription_fhir():
         "resourceType": "Subscription",
         "status": "active",
         "reason": "Notificação automática de novas Observations para o serviço de integração (TP02)",
-        "criteria": "Observation?",   # critério: qualquer nova Observation
+        "criteria": "Observation",   # critério: qualquer nova Observation
         "channel": {
             "type": "rest-hook",           # tipo: webhook HTTP POST
             "endpoint": WEBHOOK_URL,       # URL do nosso endpoint de webhook
