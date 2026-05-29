@@ -158,7 +158,8 @@ app = FastAPI(
         "FHIR Subscription R4 (Opção A — REST-hook). O servidor HAPI FHIR notifica "
         "este serviço automaticamente via `POST /webhook/fhir-observation` sempre que "
         "uma nova Observation é registada. A Subscription é criada no arranque do serviço.\n\n"
-        "**Autenticação:** JWT Bearer Token. Utilize `POST /token` para obter um token de acesso."
+        "**Autenticação:** JWT Bearer Token. Utilize `POST /token` para obter um token "
+        "e cole-o no botão **Authorize → BearerAuth**."
     ),
     version="2.0.0"
 )
