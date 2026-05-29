@@ -253,9 +253,9 @@
           }
         ],
         "url": {
-          "raw": "http://localhost:8085/ehrbase/rest/openehr/v1/ehr?subject_id=pat-{{patient_id}}&subject_namespace=pt_sns_utente",
+          "raw": "http://127.0.0.1:8085/ehrbase/rest/openehr/v1/ehr?subject_id=pat-{{patient_id}}&subject_namespace=pt_sns_utente",
           "host": [
-            "http://localhost:8085"
+            "127.0.0.1:8085"
           ],
           "path": [
             "ehrbase",
@@ -271,7 +271,7 @@
             },
             {
               "key": "subject_namespace",
-              "value": "pt_sns_utente"
+              "value": "pt.sns.utente"
             }
           ]
         },
@@ -293,6 +293,121 @@
             "ehr",
             "COLOQUE_AQUI_O_ID_DO_EHR",
             "observations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "7. Enviar Vários Sinais Vitais em Lote (FHIR Bundle)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"resourceType\": \"Bundle\",\n  \"type\": \"transaction\",\n  \"entry\": [\n    {\n      \"resource\": {\n        \"resourceType\": \"Observation\",\n        \"status\": \"final\",\n        \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8310-5\"}]},\n        \"subject\": {\"reference\": \"Patient/pat-{{patient_id}}\"},\n        \"performer\": [{\"reference\": \"Practitioner/prac-{{practitioner_id}}\"}],\n        \"effectiveDateTime\": \"2024-05-18T10:00:00Z\",\n        \"valueQuantity\": {\"value\": 37.2, \"unit\": \"Cel\", \"system\": \"http://unitsofmeasure.org\", \"code\": \"Cel\"}\n      }\n    },\n    {\n      \"resource\": {\n        \"resourceType\": \"Observation\",\n        \"status\": \"final\",\n        \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8867-4\"}]},\n        \"subject\": {\"reference\": \"Patient/pat-{{patient_id}}\"},\n        \"performer\": [{\"reference\": \"Practitioner/prac-{{practitioner_id}}\"}],\n        \"effectiveDateTime\": \"2024-05-18T10:00:00Z\",\n        \"valueQuantity\": {\"value\": 72, \"unit\": \"/min\", \"system\": \"http://unitsofmeasure.org\", \"code\": \"/min\"}\n      }\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/Bundle",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Bundle"
+          ]
+        },
+        "description": "Desafio Extra: Suporta um FHIR Bundle com múltiplas Observations numa única chamada, processando-as em lote."
+      },
+      "response": []
+    },
+    {
+      "name": "8. Pesquisar Pacientes (GET)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/Patient?name=Helena",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Patient"
+          ],
+          "query": [
+            {
+              "key": "name",
+              "value": "Helena"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "9. Pesquisar Profissionais (GET)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/Practitioner?especialidade=Cardiologia",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Practitioner"
+          ],
+          "query": [
+            {
+              "key": "especialidade",
+              "value": "Cardiologia"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10. Obter Observations do Paciente (GET)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/Observation?patient={{patient_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "Observation"
+          ],
+          "query": [
+            {
+              "key": "patient",
+              "value": "{{patient_id}}"
+            }
           ]
         }
       },

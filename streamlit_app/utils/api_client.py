@@ -91,3 +91,28 @@ def pesquisar_observacoes(patient_id: str, headers: dict) -> list:
     r.raise_for_status()
     data = r.json()
     return data.get("entry", [])
+
+
+# ─────────────────────────────────────────────
+#  CONSULTAS (ENCOUNTER)
+# ─────────────────────────────────────────────
+
+def criar_consulta(data: dict, headers: dict) -> dict:
+    """POST /Encounter — Cria uma nova consulta."""
+    r = requests.post(f"{FASTAPI_URL}/Encounter", json=data, headers=headers, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def pesquisar_consultas(patient_id: str | None, status: str | None, headers: dict) -> list:
+    """GET /Encounter — Pesquisa consultas por paciente ou estado."""
+    params = {}
+    if patient_id:
+        params["patient"] = patient_id
+    if status:
+        params["status"] = status
+    r = requests.get(f"{FASTAPI_URL}/Encounter", params=params, headers=headers, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return data.get("entry", [])
+

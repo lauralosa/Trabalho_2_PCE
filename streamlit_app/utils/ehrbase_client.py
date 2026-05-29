@@ -30,7 +30,7 @@ def get_ehr_by_subject(patient_fhir_id: str) -> dict | None:
 
     O backend (main.py → garantir_ehr) cria o EHR com:
       subject_id        = patient_fhir_id  (ex: "pat-1")
-      subject_namespace = "pt_sns_utente"
+      subject_namespace = "pt.sns.utente"
 
     Por isso o frontend tem de pesquisar com os mesmos valores.
 
@@ -42,8 +42,8 @@ def get_ehr_by_subject(patient_fhir_id: str) -> dict | None:
     """
     url = f"{EHRBASE_URL}/ehr"
     params = {
-        "subject_id": patient_fhir_id,        # ex: "pat-1" — igual ao que o backend gravou
-        "subject_namespace": "pt_sns_utente", # namespace definido em garantir_ehr()
+        "subject_id": patient_fhir_id,         # ex: "pat-1" — igual ao que o backend gravou
+        "subject_namespace": "pt.sns.utente",  # namespace definido em garantir_ehr()
     }
     try:
         r = requests.get(url, params=params, auth=EHR_AUTH, timeout=10)
@@ -75,7 +75,7 @@ def query_sinais_vitais_aql(patient_fhir_id: str) -> list:
     Executa uma query AQL no EHRbase para obter todos os sinais vitais
     de um utente identificado pelo FHIR Patient ID (ex: 'pat-1').
 
-    O namespace 'pt_sns_utente' é o que o backend usa em garantir_ehr().
+    O namespace 'pt.sns.utente' é o que o backend usa em garantir_ehr().
 
     Retorna uma lista de dicionários com os campos:
     - tipo (nome do sinal vital)
@@ -98,7 +98,7 @@ def query_sinais_vitais_aql(patient_fhir_id: str) -> list:
         CONTAINS COMPOSITION c
         CONTAINS OBSERVATION obs
     WHERE e/ehr_status/subject/external_ref/id/value = '{patient_fhir_id}'
-      AND e/ehr_status/subject/external_ref/namespace = 'pt_sns_utente'
+      AND e/ehr_status/subject/external_ref/namespace = 'pt.sns.utente'
     ORDER BY c/context/start_time/value DESC
     LIMIT 200
     """

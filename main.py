@@ -479,7 +479,7 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str) -> str:
     Returns:
         ehr_id: UUID do EHR no EHRbase (ex: "a1b2c3d4-e5f6-...")
     """
-    search_url = f"{EHRBASE_URL}/ehr?subject_id={patient_fhir_id}&subject_namespace=pt_sns_utente"
+    search_url = f"{EHRBASE_URL}/ehr?subject_id={patient_fhir_id}&subject_namespace=pt.sns.utente"
     try:
         res = requests.get(search_url, auth=EHR_AUTH, timeout=10)
         if res.status_code == 200:
@@ -499,7 +499,7 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str) -> str:
             "external_ref": {
                 # externalId: guarda o Patient.id do FHIR → garante ligação bidirecional
                 "id": {"_type": "GENERIC_ID", "value": patient_fhir_id, "scheme": "fhir"},
-                "namespace": "pt_sns_utente",
+                "namespace": "pt.sns.utente",
                 "type": "PERSON"
             }
         },
@@ -692,7 +692,8 @@ def obter_dados_medico_fhir(ref: str) -> dict:
             cedula = None
             sistema = None
             for ident in data.get("identifier", []):
-                if "ordem" in ident.get("system", ""):
+                sys_url = ident.get("system", "")
+                if sys_url in ["https://www.ordemdosmedicos.pt", "https://www.ordemenfermeiros.pt"]:
                     cedula = ident.get("value")
                     sistema = ident.get("system")
                     break
@@ -1643,7 +1644,7 @@ async def registar_subscription_fhir():
             bundle = check.json()
             if bundle.get("total", 0) > 0:
                 logger.info(
-                    f"ℹ️  [STARTUP] FHIR Subscription já existe para '{WEBHOOK_URL}'. "
+                    f"  [STARTUP] FHIR Subscription já existe para '{WEBHOOK_URL}'. "
                     f"Nenhuma ação necessária."
                 )
                 return
@@ -1686,7 +1687,7 @@ async def registar_subscription_fhir():
 
 
 # =============================================================================
-# SECÇÃO 18: DESAFIO EXTRA — Operação Inversa
+# SECÇÃO 18: Operação Inversa
 # =============================================================================
 
 @app.get("/ehr/{ehr_id}/observations", tags=["Desafios Extra"])
