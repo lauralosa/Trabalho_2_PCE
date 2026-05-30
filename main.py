@@ -936,7 +936,8 @@ def processar_observation(fhir_obs: dict) -> dict:
                 "ehr_id": ehr_id,
                 "composition_uid": comp_uid,
                 "numero_utente_sns": numero_utente,
-                "profissional": nome_medico
+                "profissional": practitioner_info.get("nome")
+
             }
         else:
             # EHRbase retorna detalhes do erro no corpo da resposta
