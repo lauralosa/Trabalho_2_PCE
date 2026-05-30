@@ -9,7 +9,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.auth import require_auth, get_auth_headers
-from utils.api_client import criar_observacao, pesquisar_observacoes
+from utils.api_client import criar_observacao, pesquisar_observacoes, get_observacao_por_id
 from utils.style import apply_custom_style
 import requests as req
 
@@ -330,3 +330,66 @@ with tab_consultar:
             st.error(f"Erro ao consultar observações: {e}")
     elif btn_pesq_obs:
         st.warning("Introduza o ID numérico do paciente.")
+
+    # ── Pesquisa por ID da Observação ─────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### Pesquisar Observação por ID")
+
+    col_obs_id, col_btn_obs_id = st.columns([4, 1])
+    with col_obs_id:
+        obs_id_pesquisa = st.text_input(
+            "ID da observação",
+            placeholder="Introduza o ID numérico (Ex: 1)",
+            label_visibility="collapsed",
+            key="pesq_obs_por_id",
+        )
+    with col_btn_obs_id:
+        btn_pesq_obs_id = st.button("Pesquisar por ID", use_container_width=True, key="btn_pesq_obs_id")
+
+    if btn_pesq_obs_id and obs_id_pesquisa.strip():
+        try:
+            with st.spinner("A consultar observação..."):
+                resource = get_observacao_por_id(obs_id_pesquisa.strip(), headers)
+
+            if resource is None:
+                st.warning(f"Nenhuma observação encontrada com o ID '{obs_id_pesquisa.strip()}'.")
+            else:
+                obs_id_res = resource.get("id", "—")
+                coding = resource.get("code", {}).get("coding", [{}])
+                tipo = coding[0].get("display", "—") if coding else "—"
+                loinc = coding[0].get("code", "—") if coding else "—"
+                vq = resource.get("valueQuantity", {})
+                valor_obs = vq.get("value", "—")
+                unidade_obs = vq.get("unit", "—")
+                data_obs = resource.get("effectiveDateTime", "—")
+                status_obs = resource.get("status", "—")
+                subject_ref = resource.get("subject", {}).get("reference", "—")
+
+                try:
+                    data_fmt = datetime.fromisoformat(data_obs.replace("Z", "+00:00")).strftime("%d/%m/%Y %H:%M")
+                except Exception:
+                    data_fmt = data_obs
+
+                st.success(f"Observação encontrada: {tipo}")
+                st.markdown(
+                    f"""
+                    <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important;">
+                        <strong style="font-size:1.1rem; font-family:'Outfit';">{tipo}</strong> &nbsp;
+                        <span class="tag-badge" style="font-family:monospace;">{loinc}</span><br>
+                        <span style="font-size:0.88rem; line-height:1.6; margin-top:0.4rem; display:block;">
+                            Medição: <strong>{valor_obs} {unidade_obs}</strong> &nbsp;·&nbsp;
+                            Data: {data_fmt} &nbsp;·&nbsp;
+                            Estado: {status_obs} &nbsp;·&nbsp;
+                            Paciente: {subject_ref} &nbsp;·&nbsp;
+                            ID: {obs_id_res}
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                with st.expander("Ver recurso FHIR completo"):
+                    st.json(resource)
+        except Exception as e:
+            st.error(f"Erro ao pesquisar por ID: {e}")
+    elif btn_pesq_obs_id:
+        st.warning("Introduza o ID numérico da observação.")

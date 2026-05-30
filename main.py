@@ -480,7 +480,7 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str) -> str:
     Returns:
         ehr_id: UUID do EHR no EHRbase (ex: "a1b2c3d4-e5f6-...")
     """
-    search_url = f"{EHRBASE_URL}/ehr?subject_id={patient_fhir_id}&subject_namespace=pt.sns.utente"
+    search_url = f"{EHRBASE_URL}/ehr?subject_id={patient_fhir_id}&subject_namespace=pt_sns_utente"
     try:
         res = requests.get(search_url, auth=EHR_AUTH, timeout=10)
         if res.status_code == 200:
@@ -500,7 +500,7 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str) -> str:
             "external_ref": {
                 # externalId: guarda o Patient.id do FHIR → garante ligação bidirecional
                 "id": {"_type": "GENERIC_ID", "value": patient_fhir_id, "scheme": "fhir"},
-                "namespace": "pt.sns.utente",
+                "namespace": "pt_sns_utente",
                 "type": "PERSON"
             }
         },
@@ -1482,7 +1482,7 @@ async def post_observation(data: ObservationSchema, user: str = Depends(get_curr
         new_id = cur.fetchone()[0]
         fhir_obs = to_fhir_observation(new_id, data)
         fhir_obs["id"] = f"obs-{new_id}"
-        response = requests.post(f"{HAPI_URL}/Observation", json=fhir_obs, timeout=5)
+        response = requests.put(f"{HAPI_URL}/Observation/obs-{new_id}", json=fhir_obs, timeout=5)
         response.raise_for_status()
         conn.commit()
         logger.info(f"Observation criada: obs-{new_id} — o HAPI FHIR irá notificar o webhook.")
@@ -1517,11 +1517,17 @@ async def get_obs(
 
 @app.get("/Observation/{id}", summary="Obter Observation por ID", tags=["FHIR — Recursos"])
 async def get_observation_by_id(id: str, user: str = Depends(get_current_user)):
-    """Obtém uma Observation pelo ID local (ex: '1' para buscar 'obs-1'). Requer autenticação JWT."""
+    """Obtém uma Observation pelo ID local (ex: '1' para buscar 'obs-1') ou ID numérico. Requer autenticação JWT."""
     try:
-        response = requests.get(f"{HAPI_URL}/Observation/obs-{id}", timeout=5)
+        fhir_id = id if id.startswith("obs-") else f"obs-{id}"
+        response = requests.get(f"{HAPI_URL}/Observation/{fhir_id}", timeout=5)
         if response.status_code == 404:
-            raise HTTPException(status_code=404, detail=f"Observation com ID '{id}' não encontrada no FHIR.")
+            # Fallback para observações antigas criadas sem o prefixo 'obs-'
+            response_fallback = requests.get(f"{HAPI_URL}/Observation/{id}", timeout=5)
+            if response_fallback.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Observation com ID '{id}' ou '{fhir_id}' não encontrada no FHIR.")
+            response_fallback.raise_for_status()
+            return response_fallback.json()
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
@@ -1687,7 +1693,7 @@ async def registar_subscription_fhir():
         "resourceType": "Subscription",
         "status": "active",
         "reason": "Notificação automática de novas Observations para o serviço de integração (TP02)",
-        "criteria": "Observation",   # critério: qualquer nova Observation
+        "criteria": "Observation?status=final,preliminary,registered,amended,corrected",
         "channel": {
             "type": "rest-hook",           # tipo: webhook HTTP POST
             "endpoint": WEBHOOK_URL,       # URL do nosso endpoint de webhook

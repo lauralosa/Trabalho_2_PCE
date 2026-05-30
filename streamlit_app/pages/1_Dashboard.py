@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.auth import require_auth, get_auth_headers
 from utils.style import apply_custom_style
+from utils.api_client import get_observacoes_por_ehr
 from utils.ehrbase_client import (
     get_ehr_by_subject,
     query_sinais_vitais_aql,
@@ -319,3 +320,84 @@ if pesquisar and numero_utente.strip():
 
 elif pesquisar and not numero_utente.strip():
     st.warning("Introduza o N.º de Utente SNS para pesquisar.")
+
+# ─── Operação Inversa EHR → FHIR ────────────────────────────────────────────────
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div class="premium-card">
+        <h2 style="font-size: 1.4rem; font-weight: 700; margin:0;">Operação Inversa — EHR → FHIR</h2>
+        <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem;">Dado o UUID de um EHR no EHRbase, recupera as Observations correspondentes no HAPI FHIR</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+col_ehr, col_btn_ehr = st.columns([4, 1])
+with col_ehr:
+    ehr_id_input = st.text_input(
+        "EHR ID (UUID)",
+        placeholder="Introduza o UUID do EHR (Ex: a1b2c3d4-e5f6-...)",
+        label_visibility="collapsed",
+        key="ehr_id_input",
+    )
+with col_btn_ehr:
+    btn_ehr = st.button("Pesquisar", use_container_width=True, key="btn_pesq_ehr", type="primary")
+
+if btn_ehr and ehr_id_input.strip():
+    try:
+        with st.spinner("A consultar EHRbase e HAPI FHIR..."):
+            resultado = get_observacoes_por_ehr(ehr_id_input.strip(), headers)
+
+        if resultado is None:
+            st.warning("EHR não encontrado no EHRbase. Verifique o UUID.")
+        else:
+            fhir_patient_id = resultado.get("fhir_patient_id", "—")
+            total = resultado.get("total_observations", 0)
+            observations = resultado.get("observations", [])
+
+            st.success(
+                f"EHR encontrado! Paciente FHIR: **{fhir_patient_id}** · "
+                f"{total} observação(ões) encontrada(s) no HAPI FHIR."
+            )
+
+            if observations:
+                for obs in observations:
+                    coding = obs.get("code", {}).get("coding", [{}])
+                    tipo = coding[0].get("display", "—") if coding else "—"
+                    loinc = coding[0].get("code", "—") if coding else "—"
+                    vq = obs.get("valueQuantity", {})
+                    valor = vq.get("value", "—")
+                    unidade = vq.get("unit", "—")
+                    data = obs.get("effectiveDateTime", "—")
+                    status = obs.get("status", "—")
+
+                    try:
+                        data_fmt = datetime.fromisoformat(data.replace("Z", "+00:00")).strftime("%d/%m/%Y %H:%M")
+                    except Exception:
+                        data_fmt = data
+
+                    st.markdown(
+                        f"""
+                        <div class="premium-card" style="padding: 1rem !important; margin-bottom: 0.5rem !important;">
+                            <strong style="font-family:'Outfit';">{tipo}</strong>
+                            <span class="tag-badge" style="font-family:monospace; margin-left:0.5rem;">{loinc}</span><br>
+                            <span style="font-size:0.88rem;">
+                                Valor: <strong>{valor} {unidade}</strong> &nbsp;·&nbsp;
+                                Data: {data_fmt} &nbsp;·&nbsp;
+                                Estado: {status}
+                            </span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                with st.expander("Ver resposta JSON completa"):
+                    st.json(resultado)
+            else:
+                st.info("O EHR existe mas não tem observações associadas no HAPI FHIR.")
+
+    except Exception as e:
+        st.error(f"Erro na operação inversa: {e}")
+elif btn_ehr:
+    st.warning("Introduza o UUID do EHR.")
