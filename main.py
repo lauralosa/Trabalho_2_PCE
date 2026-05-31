@@ -1647,7 +1647,7 @@ async def registar_subscription_fhir():
       3. Se não existir → cria nova Subscription via POST /fhir/Subscription
 
     A Subscription usa:
-      - criteria: "Observation?" → notifica para qualquer nova Observation
+      - criteria: "Observation?status=final,preliminary,registered,amended,corrected" → notifica apenas para Observations com estados válidos
       - channel.type: "rest-hook" → envia HTTP POST (webhook)
       - channel.endpoint: WEBHOOK_URL → o nosso endpoint de webhook
       - channel.payload: "application/fhir+json" → formato JSON FHIR
@@ -1698,11 +1698,7 @@ async def registar_subscription_fhir():
         "resourceType": "Subscription",
         "status": "active",
         "reason": "Notificação automática de novas Observations para o serviço de integração (TP02)",
-<<<<<<< HEAD
-        "criteria": "Observation?",   # critério: qualquer nova Observation (formato obrigatório FHIR R4: "{Tipo}?[params]")
-=======
         "criteria": "Observation?status=final,preliminary,registered,amended,corrected",
->>>>>>> 32581da5e80525cd5d6cb7c48047e3e5eb8afd60
         "channel": {
             "type": "rest-hook",           # tipo: webhook HTTP POST
             "endpoint": WEBHOOK_URL,       # URL do nosso endpoint de webhook
