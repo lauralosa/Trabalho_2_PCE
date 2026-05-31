@@ -9,7 +9,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.auth import require_auth, get_auth_headers
-from utils.api_client import criar_observacao, pesquisar_observacoes, get_observacao_por_id
+from utils.api_client import criar_observacao, pesquisar_observacoes, get_observacao_por_id, enviar_bundle
 from utils.style import apply_custom_style
 import requests as req
 
@@ -77,7 +77,7 @@ st.markdown(
 )
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab_criar, tab_consultar = st.tabs(["Registar Observação", "Consultar Observações"])
+tab_criar, tab_bundle, tab_consultar = st.tabs(["Registar Observação", " Registar em Bundle", "Consultar Observações"])
 
 # ══════════════════════════════════════════════════════════════
 # TAB 1 — CRIAR OBSERVAÇÃO
@@ -266,7 +266,247 @@ with tab_criar:
                 st.error(f"Erro ao registar observação: {detalhe}")
 
 # ══════════════════════════════════════════════════════════════
-# TAB 2 — CONSULTAR OBSERVAÇÕES
+# TAB 2 — BUNDLE DE OBSERVAÇÕES
+# ══════════════════════════════════════════════════════════════
+with tab_bundle:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="loinc-info" style="margin-bottom:1rem;">
+            <strong>📦 FHIR Bundle</strong> — Envia múltiplos sinais vitais de uma só vez para o mesmo utente,
+            num único pedido HTTP ao servidor. Mais eficiente do que N pedidos individuais.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── Passo 1: Identificar Utente ───────────────────────────────────────────
+    st.markdown("#### Passo 1 — Identificar Utente")
+    col_bsns, col_bbtn = st.columns([4, 1])
+    with col_bsns:
+        b_sns_input = st.text_input(
+            "N.º de Utente SNS",
+            placeholder="Ex: 123456789",
+            key="bundle_sns",
+            label_visibility="collapsed",
+        )
+    with col_bbtn:
+        b_btn_buscar = st.button("Verificar", key="bundle_btn_sns")
+
+    b_patient_fhir_id = None
+    b_patient_nome = None
+
+    if b_btn_buscar and b_sns_input.strip():
+        try:
+            r = req.get(
+                f"{HAPI_URL}/Patient",
+                params={"identifier": f"https://www.sns.gov.pt/utente|{b_sns_input.strip()}"},
+                timeout=8,
+            )
+            if r.status_code == 200:
+                entries = r.json().get("entry", [])
+                if entries:
+                    resource = entries[0]["resource"]
+                    b_patient_fhir_id = resource.get("id", "")
+                    b_patient_nome = resource.get("name", [{}])[0].get("text", "Desconhecido")
+                    st.session_state["bundle_patient_id"] = b_patient_fhir_id
+                    st.session_state["bundle_patient_nome"] = b_patient_nome
+                    st.session_state["bundle_sns_confirmed"] = b_sns_input.strip()
+                    st.success(f"Utente encontrado: {b_patient_nome} (FHIR ID: {b_patient_fhir_id})")
+                else:
+                    st.warning("Nenhum paciente encontrado com este N.º de Utente. Registe-o primeiro.")
+        except Exception as e:
+            st.error(f"Erro ao consultar FHIR: {e}")
+
+    if "bundle_patient_id" in st.session_state and not b_btn_buscar:
+        b_patient_fhir_id = st.session_state["bundle_patient_id"]
+        b_patient_nome = st.session_state.get("bundle_patient_nome", "")
+        st.info(
+            f"Utente selecionado: {b_patient_nome} "
+            f"(SNS: {st.session_state.get('bundle_sns_confirmed', '—')}, FHIR ID: {b_patient_fhir_id})"
+        )
+
+    st.markdown("---")
+
+    # ── Passo 2: Adicionar observações ao bundle ──────────────────────────────
+    st.markdown("#### Passo 2 — Compor Bundle")
+
+    if "bundle_observacoes" not in st.session_state:
+        st.session_state["bundle_observacoes"] = []
+
+    col_btipo, col_bstatus = st.columns(2)
+    with col_btipo:
+        b_tipo = st.selectbox(
+            "Tipo de Sinal Vital",
+            options=list(SINAIS_VITAIS.keys()),
+            key="bundle_tipo",
+        )
+    with col_bstatus:
+        b_estado = st.selectbox(
+            "Estado",
+            options=["final", "preliminary", "registered", "amended", "corrected"],
+            key="bundle_estado",
+        )
+
+    b_info = SINAIS_VITAIS[b_tipo]
+    st.markdown(
+        f"""
+        <div class="loinc-info">
+            Código LOINC: <span class="loinc-code">{b_info['loinc']}</span>
+            &nbsp;·&nbsp; Display: <em>{b_info['display']}</em>
+            &nbsp;·&nbsp; Unidade padrão: <strong>{b_info['unidade']}</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    with st.form("form_bundle_add", clear_on_submit=True):
+        col_bval, col_bunit, col_bdata = st.columns(3)
+        with col_bval:
+            b_valor = st.number_input(
+                f"Valor ({b_info['unidade']})",
+                min_value=float(b_info["min"]),
+                max_value=float(b_info["max"]),
+                value=float((b_info["min"] + b_info["max"]) / 2),
+                step=float(b_info["step"]),
+                format="%.1f",
+                key="bundle_valor",
+            )
+        with col_bunit:
+            b_unidade = st.text_input("Unidade", value=b_info["unidade"], key="bundle_unidade")
+        with col_bdata:
+            b_data = st.date_input("Data", value=datetime.now().date(), key="bundle_data")
+
+        b_hora = st.time_input("Hora", value=datetime.now().time(), key="bundle_hora")
+
+        b_add = st.form_submit_button("➕ Adicionar ao Bundle", use_container_width=True)
+
+    if b_add:
+        b_info_snap = SINAIS_VITAIS[b_tipo]
+        dt_combined = datetime.combine(b_data, b_hora)
+        data_iso = dt_combined.strftime("%Y-%m-%dT%H:%M:%SZ")
+        st.session_state["bundle_observacoes"].append({
+            "tipo": b_tipo,
+            "loinc": b_info_snap["loinc"],
+            "display": b_info_snap["display"],
+            "estado": b_estado,
+            "valor": b_valor,
+            "unidade": b_unidade.strip(),
+            "sistema_unit": b_info_snap["sistema_unit"],
+            "dataExecucao": data_iso,
+        })
+        st.success(f"Adicionado: {b_tipo} — {b_valor} {b_unidade}")
+
+    # ── Mostrar observações pendentes ─────────────────────────────────────────
+    obs_list = st.session_state.get("bundle_observacoes", [])
+    if obs_list:
+        st.markdown(f"**{len(obs_list)} observação(ões) no bundle:**")
+        for idx, o in enumerate(obs_list):
+            col_obs, col_del = st.columns([6, 1])
+            with col_obs:
+                st.markdown(
+                    f"""
+                    <div class="premium-card" style="padding:0.8rem 1.2rem !important; margin-bottom:0.3rem !important;">
+                        <strong>{o['tipo']}</strong>
+                        <span class="tag-badge" style="font-family:monospace;">{o['loinc']}</span>
+                        &nbsp;·&nbsp; {o['valor']} {o['unidade']}
+                        &nbsp;·&nbsp; {o['dataExecucao']}
+                        &nbsp;·&nbsp; <em>{o['estado']}</em>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with col_del:
+                if st.button("🗑️", key=f"del_bundle_{idx}", help="Remover"):
+                    st.session_state["bundle_observacoes"].pop(idx)
+                    st.rerun()
+
+        col_clear, col_send = st.columns([1, 2])
+        with col_clear:
+            if st.button("🧹 Limpar Bundle", use_container_width=True):
+                st.session_state["bundle_observacoes"] = []
+                st.rerun()
+        with col_send:
+            btn_enviar_bundle = st.button(
+                "🚀 Enviar Bundle",
+                type="primary",
+                use_container_width=True,
+                key="btn_enviar_bundle",
+            )
+
+        if btn_enviar_bundle:
+            if not b_patient_fhir_id:
+                st.error("Verifique o N.º de Utente SNS antes de enviar (Passo 1).")
+            else:
+                id_numerico = b_patient_fhir_id.replace("pat-", "")
+                entries_fhir = []
+                for o in obs_list:
+                    obs_resource = {
+                        "resourceType": "Observation",
+                        "status": o["estado"],
+                        "code": {
+                            "coding": [{
+                                "system": "http://loinc.org",
+                                "code": o["loinc"],
+                                "display": o["display"],
+                            }],
+                            "text": o["display"],
+                        },
+                        "subject": {"reference": f"Patient/pat-{id_numerico}"},
+                        "effectiveDateTime": o["dataExecucao"],
+                        "valueQuantity": {
+                            "value": o["valor"],
+                            "unit": o["unidade"],
+                            "system": o["sistema_unit"],
+                            "code": o["unidade"],
+                        },
+                    }
+                    entries_fhir.append({"resource": obs_resource})
+
+                bundle_payload = {
+                    "resourceType": "Bundle",
+                    "type": "transaction",
+                    "entry": entries_fhir,
+                }
+
+                try:
+                    with st.spinner("A enviar Bundle para o servidor..."):
+                        resultado = enviar_bundle(bundle_payload, headers)
+
+                    processadas = resultado.get("processadas", 0)
+                    ignoradas = resultado.get("ignoradas", 0)
+                    st.success(
+                        f"Bundle enviado! ✅ {processadas} aceite(s) · ⚠️ {ignoradas} ignorada(s)"
+                    )
+
+                    # Relatório por entrada
+                    with st.expander("Ver relatório detalhado do Bundle"):
+                        for det in resultado.get("detalhes", []):
+                            icon = "✅" if det.get("status") == "aceite" else "⚠️"
+                            st.markdown(
+                                f"{icon} **Entrada {det['entry_index']}** — "
+                                f"status: `{det.get('status')}` "
+                                + (f"· sinal: {det.get('sinal_vital', '')}" if det.get("sinal_vital") else f"· motivo: {det.get('motivo', '')}"),
+                            )
+                        st.json(resultado)
+
+                    # Limpar bundle após envio com sucesso
+                    st.session_state["bundle_observacoes"] = []
+
+                except Exception as e:
+                    detalhe = str(e)
+                    if hasattr(e, "response") and e.response is not None:
+                        try:
+                            detalhe = e.response.json().get("detail", e.response.text)
+                        except Exception:
+                            detalhe = e.response.text
+                    st.error(f"Erro ao enviar Bundle: {detalhe}")
+    else:
+        st.info("Ainda não adicionou nenhuma observação ao Bundle. Use o formulário acima.")
+
+# ══════════════════════════════════════════════════════════════
+# TAB 3 — CONSULTAR OBSERVAÇÕES
 # ══════════════════════════════════════════════════════════════
 with tab_consultar:
     st.markdown("<br>", unsafe_allow_html=True)

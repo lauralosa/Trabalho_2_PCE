@@ -80,6 +80,13 @@ def criar_observacao(data: dict, headers: dict) -> dict:
     return r.json()
 
 
+def enviar_bundle(data: dict, headers: dict) -> dict:
+    """POST /Bundle — Envia um FHIR Bundle com múltiplas Observations de uma só vez."""
+    r = requests.post(f"{FASTAPI_URL}/Bundle", json=data, headers=headers, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
 def pesquisar_observacoes(patient_id: str, headers: dict) -> list:
     """GET /Observation?patient=... — Lista observações de um paciente."""
     r = requests.get(
