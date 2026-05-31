@@ -116,3 +116,51 @@ def pesquisar_consultas(patient_id: str | None, status: str | None, headers: dic
     data = r.json()
     return data.get("entry", [])
 
+
+def get_profissional_por_id(prof_id: str, headers: dict) -> dict | None:
+    """GET /Practitioner/{id} — Obtém um profissional por ID numérico."""
+    try:
+        r = requests.get(f"{FASTAPI_URL}/Practitioner/{prof_id}", headers=headers, timeout=10)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+
+
+def get_consulta_por_id(enc_id: str, headers: dict) -> dict | None:
+    """GET /Encounter/{id} — Obtém uma consulta por ID numérico."""
+    try:
+        r = requests.get(f"{FASTAPI_URL}/Encounter/{enc_id}", headers=headers, timeout=10)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+
+
+def get_observacao_por_id(obs_id: str, headers: dict) -> dict | None:
+    """GET /Observation/{id} — Obtém uma observação por ID numérico."""
+    try:
+        r = requests.get(f"{FASTAPI_URL}/Observation/{obs_id}", headers=headers, timeout=10)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+
+
+def get_observacoes_por_ehr(ehr_id: str, headers: dict) -> dict | None:
+    """GET /ehr/{ehr_id}/observations — Operação inversa: obtém observações FHIR a partir do ehr_id."""
+    try:
+        r = requests.get(f"{FASTAPI_URL}/ehr/{ehr_id}/observations", headers=headers, timeout=15)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+

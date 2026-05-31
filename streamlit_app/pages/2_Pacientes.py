@@ -8,7 +8,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.auth import require_auth, get_auth_headers
-from utils.api_client import criar_paciente, pesquisar_pacientes
+from utils.api_client import criar_paciente, pesquisar_pacientes, get_paciente_por_id
 from utils.style import apply_custom_style
 
 # ─── Configuração ────────────────────────────────────────────────────────────
@@ -224,3 +224,61 @@ with tab_pesquisar:
                     )
         except Exception as e:
             st.error(f"Erro ao pesquisar: {e}")
+
+    # ── Pesquisa por ID ───────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### Pesquisar Paciente por ID")
+
+    col_id, col_btn_id = st.columns([4, 1])
+    with col_id:
+        id_pesquisa = st.text_input(
+            "ID local do paciente",
+            placeholder="Introduza o ID numérico (Ex: 1)",
+            label_visibility="collapsed",
+            key="pesq_paciente_id",
+        )
+    with col_btn_id:
+        btn_pesq_id = st.button("Pesquisar por ID", use_container_width=True, key="btn_pesq_pac_id")
+
+    if btn_pesq_id and id_pesquisa.strip():
+        try:
+            with st.spinner("A consultar paciente..."):
+                resource = get_paciente_por_id(id_pesquisa.strip(), headers)
+
+            if resource is None:
+                st.warning(f"Nenhum paciente encontrado com o ID '{id_pesquisa.strip()}'.")
+            else:
+                pid = resource.get("id", "—")
+                pnome = resource.get("name", [{}])[0].get("text", "—")
+                pgenero = resource.get("gender", "—").capitalize()
+                identifiers = resource.get("identifier", [])
+                sns = next(
+                    (i["value"] for i in identifiers if "sns" in i.get("system", "").lower()),
+                    "—"
+                )
+                telecoms = resource.get("telecom", [])
+                tel = next((t["value"] for t in telecoms if t.get("system") == "phone"), "—")
+                email_val = next((t["value"] for t in telecoms if t.get("system") == "email"), "—")
+
+                st.success(f"Paciente encontrado: {pnome}")
+                st.markdown(
+                    f"""
+                    <div class="premium-card" style="padding: 1.2rem !important; margin-bottom: 0.5rem !important;">
+                        <strong style="font-size:1.1rem; font-family:'Outfit';">{pnome}</strong> &nbsp;
+                        <span style="font-size:0.85rem;">({pid})</span><br>
+                        <span style="font-size:0.88rem; line-height:1.6;">
+                            SNS: <strong>{sns}</strong> &nbsp;·&nbsp;
+                            Género: {pgenero} &nbsp;·&nbsp;
+                            Telemóvel: {tel} &nbsp;·&nbsp;
+                            Email: {email_val}
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                with st.expander("Ver recurso FHIR completo"):
+                    st.json(resource)
+        except Exception as e:
+            st.error(f"Erro ao pesquisar por ID: {e}")
+    elif btn_pesq_id:
+        st.warning("Introduza o ID numérico do paciente.")

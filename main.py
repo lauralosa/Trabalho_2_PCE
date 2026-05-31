@@ -1487,7 +1487,7 @@ async def post_observation(data: ObservationSchema, user: str = Depends(get_curr
         new_id = cur.fetchone()[0]
         fhir_obs = to_fhir_observation(new_id, data)
         fhir_obs["id"] = f"obs-{new_id}"
-        response = requests.post(f"{HAPI_URL}/Observation", json=fhir_obs, timeout=5)
+        response = requests.put(f"{HAPI_URL}/Observation/obs-{new_id}", json=fhir_obs, timeout=5)
         response.raise_for_status()
         conn.commit()
         logger.info(f"Observation criada: obs-{new_id} — o HAPI FHIR irá notificar o webhook.")
@@ -1522,11 +1522,17 @@ async def get_obs(
 
 @app.get("/Observation/{id}", summary="Obter Observation por ID", tags=["FHIR — Recursos"])
 async def get_observation_by_id(id: str, user: str = Depends(get_current_user)):
-    """Obtém uma Observation pelo ID local (ex: '1' para buscar 'obs-1'). Requer autenticação JWT."""
+    """Obtém uma Observation pelo ID local (ex: '1' para buscar 'obs-1') ou ID numérico. Requer autenticação JWT."""
     try:
-        response = requests.get(f"{HAPI_URL}/Observation/obs-{id}", timeout=5)
+        fhir_id = id if id.startswith("obs-") else f"obs-{id}"
+        response = requests.get(f"{HAPI_URL}/Observation/{fhir_id}", timeout=5)
         if response.status_code == 404:
-            raise HTTPException(status_code=404, detail=f"Observation com ID '{id}' não encontrada no FHIR.")
+            # Fallback para observações antigas criadas sem o prefixo 'obs-'
+            response_fallback = requests.get(f"{HAPI_URL}/Observation/{id}", timeout=5)
+            if response_fallback.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Observation com ID '{id}' ou '{fhir_id}' não encontrada no FHIR.")
+            response_fallback.raise_for_status()
+            return response_fallback.json()
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
@@ -1692,7 +1698,11 @@ async def registar_subscription_fhir():
         "resourceType": "Subscription",
         "status": "active",
         "reason": "Notificação automática de novas Observations para o serviço de integração (TP02)",
+<<<<<<< HEAD
         "criteria": "Observation?",   # critério: qualquer nova Observation (formato obrigatório FHIR R4: "{Tipo}?[params]")
+=======
+        "criteria": "Observation?status=final,preliminary,registered,amended,corrected",
+>>>>>>> 32581da5e80525cd5d6cb7c48047e3e5eb8afd60
         "channel": {
             "type": "rest-hook",           # tipo: webhook HTTP POST
             "endpoint": WEBHOOK_URL,       # URL do nosso endpoint de webhook
