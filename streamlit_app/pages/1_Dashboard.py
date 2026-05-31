@@ -89,9 +89,10 @@ if pesquisar and numero_utente.strip():
     # 2. Verificar se existe EHR no EHRbase usando o FHIR Patient ID como subject_id
     #    (o backend guardou o EHR com subject_id=patient_fhir_id e namespace=pt_sns_utente)
     ehr = None
+    ehr_debug = ""
     if patient_fhir_id:
         with st.spinner("A consultar o EHRbase..."):
-            ehr = get_ehr_by_subject(patient_fhir_id)
+            ehr, ehr_debug = get_ehr_by_subject(patient_fhir_id)
 
     # ── Informação do Paciente ────────────────────────────────────────────────
     if patient_info:
@@ -134,6 +135,12 @@ if pesquisar and numero_utente.strip():
             """,
             unsafe_allow_html=True,
         )
+        # Mostrar info de debug quando EHR não foi encontrado
+        if not ehr and ehr_debug:
+            with st.expander("🔍 Debug EHRbase (clica para ver)", expanded=False):
+                st.caption(f"FHIR Patient ID usado na pesquisa: `{patient_fhir_id}`")
+                st.caption(f"EHRbase URL: `{os.getenv('EHRBASE_URL_LOCAL', 'http://localhost:8085/ehrbase/rest/openehr/v1')}`")
+                st.code(ehr_debug, language="text")
     else:
         st.warning(f"Nenhum paciente encontrado com o N.º de Utente SNS {numero_utente}.")
 

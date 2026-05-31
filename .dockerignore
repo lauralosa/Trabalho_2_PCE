@@ -1,0 +1,29 @@
+# Ambiente virtual Python — nunca deve entrar na imagem Docker
+venv/
+env/
+.venv/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Git
+.git/
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Variáveis de ambiente locais
+.env
+.env.local
+
+# Ficheiros de desenvolvimento
+README.md
