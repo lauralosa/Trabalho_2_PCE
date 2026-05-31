@@ -40,10 +40,9 @@ col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     st.markdown(
         """
-        <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 1.6rem;"></div>
-            <div style="font-weight: 700; font-size: 1.0rem; margin-bottom: 0.3rem;">Dashboard</div>
-            <div style="font-size: 0.82rem;">Histórico de sinais vitais consultado a partir do EHRbase</div>
+        <div class="premium-card" style="text-align: center; min-height: 200px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0px !important; padding: 1.5rem 1rem !important;">
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.4rem; color: #fff;">Dashboard</div>
+            <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.3;">Histórico de sinais vitais consultado a partir do EHRbase</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -52,10 +51,9 @@ with col1:
 with col2:
     st.markdown(
         """
-        <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 1.6rem;"></div>
-            <div style="font-weight: 700; font-size: 1.0rem; margin-bottom: 0.3rem;">Pacientes</div>
-            <div style="font-size: 0.82rem;">Registo e pesquisa de utentes no FHIR R4</div>
+        <div class="premium-card" style="text-align: center; min-height: 200px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0px !important; padding: 1.5rem 1rem !important;">
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.4rem; color: #fff;">Pacientes</div>
+            <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.3;">Registo e pesquisa de utentes no FHIR R4</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -64,10 +62,9 @@ with col2:
 with col3:
     st.markdown(
         """
-        <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 1.6rem;"></div>
-            <div style="font-weight: 700; font-size: 1.0rem; margin-bottom: 0.3rem;">Profissionais</div>
-            <div style="font-size: 0.82rem;">Gestão de médicos e enfermeiros com cédula de identificação</div>
+        <div class="premium-card" style="text-align: center; min-height: 200px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0px !important; padding: 1.5rem 1rem !important;">
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.4rem; color: #fff;">Profissionais</div>
+            <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.3;">Gestão de médicos e enfermeiros com cédula</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -76,10 +73,9 @@ with col3:
 with col4:
     st.markdown(
         """
-        <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 1.6rem;"></div>
-            <div style="font-weight: 700; font-size: 1.0rem; margin-bottom: 0.3rem;">Consultas</div>
-            <div style="font-size: 0.82rem;">Registo e pesquisa de Encounters (consultas clínicas)</div>
+        <div class="premium-card" style="text-align: center; min-height: 200px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0px !important; padding: 1.5rem 1rem !important;">
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.4rem; color: #fff;">Consultas</div>
+            <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.3;">Registo e pesquisa de Encounters (consultas clínicas)</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -88,10 +84,9 @@ with col4:
 with col5:
     st.markdown(
         """
-        <div class="premium-card" style="text-align: center; height: 100%; margin-bottom: 0px !important;">
-            <div style="font-size: 1.6rem;"></div>
-            <div style="font-weight: 700; font-size: 1.0rem; margin-bottom: 0.3rem;">Observações</div>
-            <div style="font-size: 0.82rem;">Registo estruturado de novos sinais vitais por utente</div>
+        <div class="premium-card" style="text-align: center; min-height: 200px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0px !important; padding: 1.5rem 1rem !important;">
+            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.4rem; color: #fff;">Observações</div>
+            <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.3;">Registo estruturado de novos sinais vitais por utente</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -121,10 +116,10 @@ with col_s1:
     ok = check_service(f"{FASTAPI_URL}/docs", "FastAPI")
     cor = "#10b981" if ok else "#ef4444"
     st.markdown(
-        f'<div class="premium-card" style="text-align:center; padding:1rem !important;">'
-        f'<div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;">FastAPI</div>'
-        f'<div style="font-size:1.3rem;font-weight:700;color:{cor};">{ "Online" if ok else "Offline" }</div>'
-        f'<div style="font-size:0.7rem;margin-top:0.2rem;opacity:0.6;">Integration Service</div>'
+        f'<div class="premium-card" style="text-align:center; padding:1.5rem !important; min-height: 140px; display: flex; flex-direction: column; justify-content: center;">'
+        f'<div style="font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;color:#94a3b8;">FastAPI</div>'
+        f'<div style="font-size:1.6rem;font-weight:700;color:{cor};">{ "Online" if ok else "Offline" }</div>'
+        f'<div style="font-size:0.75rem;margin-top:0.3rem;color:#94a3b8;">Integration Service</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -133,10 +128,10 @@ with col_s2:
     ok = check_service(f"{HAPI_URL}/metadata", "HAPI FHIR")
     cor = "#10b981" if ok else "#ef4444"
     st.markdown(
-        f'<div class="premium-card" style="text-align:center; padding:1rem !important;">'
-        f'<div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;">HAPI FHIR</div>'
-        f'<div style="font-size:1.3rem;font-weight:700;color:{cor};">{ "Online" if ok else "Offline" }</div>'
-        f'<div style="font-size:0.7rem;margin-top:0.2rem;opacity:0.6;">FHIR R4 Server</div>'
+        f'<div class="premium-card" style="text-align:center; padding:1.5rem !important; min-height: 140px; display: flex; flex-direction: column; justify-content: center;">'
+        f'<div style="font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;color:#94a3b8;">HAPI FHIR</div>'
+        f'<div style="font-size:1.6rem;font-weight:700;color:{cor};">{ "Online" if ok else "Offline" }</div>'
+        f'<div style="font-size:0.75rem;margin-top:0.3rem;color:#94a3b8;">FHIR R4 Server</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -145,10 +140,10 @@ with col_s3:
     ok = check_service(f"{EHRBASE_LOCAL}/definition/template/adl1.4", "EHRbase")
     cor = "#10b981" if ok else "#ef4444"
     st.markdown(
-        f'<div class="premium-card" style="text-align:center; padding:1rem !important;">'
-        f'<div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;">EHRbase</div>'
-        f'<div style="font-size:1.3rem;font-weight:700;color:{cor};">{ "Online" if ok else "Offline" }</div>'
-        f'<div style="font-size:0.7rem;margin-top:0.2rem;opacity:0.6;">openEHR Repository</div>'
+        f'<div class="premium-card" style="text-align:center; padding:1.5rem !important; min-height: 140px; display: flex; flex-direction: column; justify-content: center;">'
+        f'<div style="font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;color:#94a3b8;">EHRbase</div>'
+        f'<div style="font-size:1.6rem;font-weight:700;color:{cor};">{ "Online" if ok else "Offline" }</div>'
+        f'<div style="font-size:0.75rem;margin-top:0.3rem;color:#94a3b8;">openEHR Repository</div>'
         f'</div>',
         unsafe_allow_html=True,
     )

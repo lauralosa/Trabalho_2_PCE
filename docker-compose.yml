@@ -69,6 +69,7 @@ services:
       - DB_PASS=password
       - EHRBASE_URL=http://ehrbase:8080/ehrbase/rest/openehr/v1
       - FHIR_SERVER_URL=http://hapi-fhir:8080/fhir
+      - TZ=Europe/Lisbon
 
   # Frontend Streamlit
   dashboard:
@@ -88,3 +89,4 @@ services:
       - FASTAPI_URL=http://integration-service:5000
       - EHRBASE_URL_LOCAL=http://ehrbase:8080/ehrbase/rest/openehr/v1
       - HAPI_FHIR_URL=http://hapi-fhir:8080/fhir
+      - TZ=Europe/Lisbon

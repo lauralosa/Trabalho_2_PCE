@@ -1,5 +1,5 @@
 """
-4_Observacoes.py — Formulário de registo de Sinais Vitais (Observations FHIR).
+4_Observações.py — Formulário de registo de Sinais Vitais (Observations FHIR).
 Substitui o Postman para o endpoint POST /Observation.
 """
 import streamlit as st
