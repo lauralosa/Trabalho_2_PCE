@@ -24,7 +24,7 @@ MAPA_SINAIS_VITAIS = {
 }
 
 
-def get_ehr_by_subject(patient_fhir_id: str) -> dict | None:
+def get_ehr_by_subject(patient_fhir_id: str) -> tuple[dict | None, str]:
     """
     Procura o EHR pelo FHIR Patient ID (ex: 'pat-1').
 
@@ -38,20 +38,27 @@ def get_ehr_by_subject(patient_fhir_id: str) -> dict | None:
         patient_fhir_id: ID do recurso Patient no FHIR (ex: "pat-1")
 
     Returns:
-        Dicionário com o EHR ou None se não existir / erro de ligação.
+        Tupla (dict_ehr_ou_None, mensagem_debug)
     """
     url = f"{EHRBASE_URL}/ehr"
     params = {
         "subject_id": patient_fhir_id,         # ex: "pat-1" — igual ao que o backend gravou
-        "subject_namespace": "pt.sns.utente",  # namespace definido em garantir_ehr()
+        "subject_namespace": "pt-sns-utente",  # namespace definido em garantir_ehr()
     }
     try:
         r = requests.get(url, params=params, auth=EHR_AUTH, timeout=10)
+        debug = f"GET {r.url} → HTTP {r.status_code}"
         if r.status_code == 200:
-            return r.json()
-        return None
-    except requests.exceptions.ConnectionError:
-        return None
+            return r.json(), debug
+        # 404 = EHR não existe (normal para novos utentes)
+        # outros status = problema de configuração
+        if r.status_code != 404:
+            debug += f" | Resposta inesperada: {r.text[:200]}"
+        return None, debug
+    except requests.exceptions.ConnectionError as e:
+        return None, f"Erro de ligação ao EHRbase ({EHRBASE_URL}): {e}"
+    except Exception as e:
+        return None, f"Erro inesperado ao consultar EHRbase: {e}"
 
 
 def get_composicoes_por_ehr(ehr_id: str) -> list:
@@ -85,20 +92,19 @@ def query_sinais_vitais_aql(patient_fhir_id: str) -> list:
     - ehr_id (str)
     """
     # AQL: seleciona valor, unidade, data e nome do sinal vital.
-    # Nota: os nós at0001/at0002/at0003/at0004 são os mais comuns nos arquétipos
-    # suportados; o fallback para FHIR cobre os casos em que a AQL não retorne dados.
+    # O fallback para FHIR cobre os casos em que a AQL não retorne dados.
     aql = f"""
     SELECT
-        obs/name/value                                                         AS tipo,
-        obs/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/magnitude AS valor,
-        obs/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/units      AS unidade,
+        obs/data/events/data/items/name/value  AS tipo,
+        obs/data/events/data/items/value/magnitude AS valor,
+        obs/data/events/data/items/value/units      AS unidade,
         c/context/start_time/value                                             AS data,
         e/ehr_id/value                                                         AS ehr_id
     FROM EHR e
         CONTAINS COMPOSITION c
         CONTAINS OBSERVATION obs
     WHERE e/ehr_status/subject/external_ref/id/value = '{patient_fhir_id}'
-      AND e/ehr_status/subject/external_ref/namespace = 'pt.sns.utente'
+      AND e/ehr_status/subject/external_ref/namespace = 'pt-sns-utente'
     ORDER BY c/context/start_time/value DESC
     LIMIT 200
     """
@@ -117,7 +123,17 @@ def query_sinais_vitais_aql(patient_fhir_id: str) -> list:
             rows = result.get("rows", [])
             cols = [col.get("name", f"col_{i}") for i, col in enumerate(result.get("columns", []))]
             # Converte para lista de dicts
-            return [dict(zip(cols, row)) for row in rows]
+            registos = [dict(zip(cols, row)) for row in rows]
+            # Remove duplicados que possam surgir da ausência de restrição de nós
+            registos_unicos = []
+            vistos = set()
+            for r_dict in registos:
+                # Usa tuplo dos valores como chave para identificar únicos
+                chave = tuple(r_dict.items())
+                if chave not in vistos:
+                    vistos.add(chave)
+                    registos_unicos.append(r_dict)
+            return registos_unicos
         return []
     except Exception:
         return []

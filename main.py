@@ -480,7 +480,7 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str) -> str:
     Returns:
         ehr_id: UUID do EHR no EHRbase (ex: "a1b2c3d4-e5f6-...")
     """
-    search_url = f"{EHRBASE_URL}/ehr?subject_id={patient_fhir_id}&subject_namespace=pt.sns.utente"
+    search_url = f"{EHRBASE_URL}/ehr?subject_id={patient_fhir_id}&subject_namespace=pt-sns-utente"
     try:
         res = requests.get(search_url, auth=EHR_AUTH, timeout=10)
         if res.status_code == 200:
@@ -500,7 +500,7 @@ def garantir_ehr(numero_utente: str, patient_fhir_id: str) -> str:
             "external_ref": {
                 # externalId: guarda o Patient.id do FHIR → garante ligação bidirecional
                 "id": {"_type": "GENERIC_ID", "value": patient_fhir_id, "scheme": "fhir"},
-                "namespace": "pt.sns.utente",
+                "namespace": "pt-sns-utente",
                 "type": "PERSON"
             }
         },
@@ -999,7 +999,12 @@ def processar_observation(fhir_obs: dict) -> dict:
     summary="Webhook FHIR Subscription — Receção de Observations (Opção A, REST-hook)",
     tags=["Fase 3 — Mecanismo de Gatilho"]
 )
-async def webhook_fhir_observation(payload: dict, background_tasks: BackgroundTasks):
+@app.put(
+    "/webhook/fhir-observation/{resource_type}/{resource_id}",
+    summary="Webhook FHIR Subscription — Receção de Observations (Opção A, REST-hook)",
+    tags=["Fase 3 — Mecanismo de Gatilho"]
+)
+async def webhook_fhir_observation(payload: dict, background_tasks: BackgroundTasks, resource_type: str = None, resource_id: str = None):
     """
     Endpoint de Webhook que recebe notificações automáticas do HAPI FHIR.
 
@@ -1687,7 +1692,7 @@ async def registar_subscription_fhir():
         "resourceType": "Subscription",
         "status": "active",
         "reason": "Notificação automática de novas Observations para o serviço de integração (TP02)",
-        "criteria": "Observation",   # critério: qualquer nova Observation
+        "criteria": "Observation?",   # critério: qualquer nova Observation (formato obrigatório FHIR R4: "{Tipo}?[params]")
         "channel": {
             "type": "rest-hook",           # tipo: webhook HTTP POST
             "endpoint": WEBHOOK_URL,       # URL do nosso endpoint de webhook

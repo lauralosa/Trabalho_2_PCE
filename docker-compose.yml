@@ -11,13 +11,14 @@ services:
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  # Servidor HAPI FHIR
   hapi-fhir:
     image: hapiproject/hapi:latest
     ports:
       - "9090:8080"
     volumes:
       - .:/fhir8080
+    environment:
+      - HAPI_FHIR_SUBSCRIPTION_RESTHOOK_ENABLED=true
 
   # ----------------------------------------------------
   #  EHRBASE
