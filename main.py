@@ -408,6 +408,7 @@ MAPA_SINAIS_VITAIS = {
         "data_node": "at0001",
         "item_node": "at0004",
         "unidade": "/min",
+        "is_interval": True,
     },
     "8310-5": {
         "nome": "Temperature",
@@ -593,7 +594,7 @@ def build_openehr_composition(fhir_obs: dict, practitioner_info: dict) -> Option
                 "_type": "DV_PROPORTION",
                 "numerator": float(valor_medicao) if valor_medicao else 0.0,
                 "denominator": 100.0,
-                "type": 3
+                "type": 2
             }
         else:
             value_block = {
@@ -662,10 +663,11 @@ def build_openehr_composition(fhir_obs: dict, practitioner_info: dict) -> Option
                         "origin": {"_type": "DV_DATE_TIME", "value": data_execucao},
                         "events": [
                             {
-                                "_type": "POINT_EVENT",
+                                "_type": "INTERVAL_EVENT" if info.get("is_interval") else "POINT_EVENT",
                                 "archetype_node_id": info["event_node"],  
                                 "name": {"_type": "DV_TEXT", "value": "Any event"},
                                 "time": {"_type": "DV_DATE_TIME", "value": data_execucao},
+                                **({"width": {"_type": "DV_DURATION", "value": "PT1M"}, "math_function": {"_type": "DV_CODED_TEXT", "value": "mean", "defining_code": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "openehr"}, "code_string": "146"}}} if info.get("is_interval") else {}),
                                 "data": {
                                     "_type": "ITEM_TREE",
                                     "archetype_node_id": info["data_node"],

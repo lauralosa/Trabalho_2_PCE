@@ -224,7 +224,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"q\": \"SELECT obs/name/value AS tipo, obs/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/magnitude AS valor, obs/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/units AS unidade, c/context/start_time/value AS data, e/ehr_id/value AS ehr_id FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION obs WHERE e/ehr_status/subject/external_ref/id/value = 'pat-{{patient_id}}' AND e/ehr_status/subject/external_ref/namespace = 'pt.sns.utente' ORDER BY c/context/start_time/value DESC LIMIT 200\"\n}"
+          "raw": "{\n    \"q\": \"SELECT obs/name/value AS tipo, obs/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude AS valor_temp_freq_peso, obs/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude AS valor_sistolica, obs/data[at0001]/events[at0002]/data[at0003]/items[at0006]/value/numerator AS valor_saturacao, obs/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/magnitude AS valor_generico, c/context/start_time/value AS data, e/ehr_id/value AS ehr_id FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION obs WHERE e/ehr_status/subject/external_ref/id/value = 'pat-{{patient_id}}' AND e/ehr_status/subject/external_ref/namespace = 'pt-sns-utente' ORDER BY c/context/start_time/value DESC LIMIT 200\"\n}"
         },
         "url": {
           "raw": "http://127.0.0.1:8085/ehrbase/rest/openehr/v1/query/aql",
